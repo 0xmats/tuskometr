@@ -1,56 +1,42 @@
-name: tuskometr-dev
+name: tuskometr
 
 services:
-  web:
-    build:
-      context: .
-      target: web
-    image: tuskometr-web:dev
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8000:8080"
-    volumes:
-      - dashboard-data:/snapshots:ro
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-
   migrate:
     build:
       context: .
       target: runtime
-    image: tuskometr:dev
+    image: ${TUSKOMETR_IMAGE:-tuskometr:production}
     command: ["alembic", "upgrade", "head"]
     environment:
       DATABASE_URL: sqlite:////data/tuskometr.db
     volumes:
-      - ./backend/alembic:/app/backend/alembic:ro
-      - ./backend/alembic.ini:/app/backend/alembic.ini:ro
       - app-data:/data
 
   publisher:
-    image: tuskometr:dev
+    image: ${TUSKOMETR_IMAGE:-tuskometr:production}
     restart: unless-stopped
     depends_on:
       migrate:
         condition: service_completed_successfully
     command: ["python", "-m", "app.publisher"]
     environment:
-      DASHBOARD_STORAGE: local
+      DASHBOARD_STORAGE: r2
+      R2_ENDPOINT_URL: ${R2_ENDPOINT_URL:?Set R2_ENDPOINT_URL}
+      R2_BUCKET: ${R2_BUCKET:?Set R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?Set R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set R2_SECRET_ACCESS_KEY}
+      R2_RETENTION_SECONDS: ${R2_RETENTION_SECONDS:-86400}
       DATABASE_URL: sqlite:////data/tuskometr.db
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Warsaw}
       DASHBOARD_REFRESH_SECONDS: ${DASHBOARD_REFRESH_SECONDS:-30}
       DASHBOARD_MAX_STALE_SECONDS: ${DASHBOARD_MAX_STALE_SECONDS:-120}
       DASHBOARD_RETENTION_SECONDS: ${DASHBOARD_RETENTION_SECONDS:-900}
     volumes:
-      - ./backend/app:/app/backend/app:ro
       - app-data:/data
       - dashboard-data:/snapshots
 
   worker:
-    image: tuskometr:dev
+    image: ${TUSKOMETR_IMAGE:-tuskometr:production}
     restart: unless-stopped
     depends_on:
       migrate:
@@ -81,18 +67,20 @@ services:
       YTDLP_COOKIES_FILE: ${YTDLP_COOKIES_FILE:-}
       HF_HOME: /models/huggingface
     volumes:
-      - ./backend/app:/app/backend/app:ro
       - app-data:/data
       - model-cache:/models
 
   backup:
-    image: tuskometr:dev
+    image: ${TUSKOMETR_IMAGE:-tuskometr:production}
     restart: unless-stopped
     depends_on:
       migrate:
         condition: service_completed_successfully
     command: ["python", "-m", "app.backup"]
+    env_file:
+      - ${TUSKOMETR_BACKUP_ENV_FILE:-./deploy/backup.env}
     environment:
+      BACKUP_REMOTE_ENABLED: "true"
       DATABASE_URL: sqlite:////data/tuskometr.db
       BACKUP_DIR: /backups
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
@@ -100,26 +88,6 @@ services:
       - app-data:/data
       - backup-data:/backups
 
-  benchmark:
-    profiles: ["tools"]
-    build:
-      context: .
-      target: runtime
-    image: tuskometr:dev
-    entrypoint: ["python", "-m", "app.benchmark"]
-    environment:
-      ASR_DEVICE: ${ASR_DEVICE:-cpu}
-      ASR_COMPUTE_TYPE: ${ASR_COMPUTE_TYPE:-int8}
-      ASR_CPU_THREADS: ${ASR_CPU_THREADS:-4}
-      ASR_BEAM_SIZE: ${ASR_BEAM_SIZE:-3}
-      ASR_HOTWORDS_VERIFY: ${ASR_HOTWORDS_VERIFY:-true}
-      CHUNK_SECONDS: ${CHUNK_SECONDS:-25}
-      CHUNK_STEP_SECONDS: ${CHUNK_STEP_SECONDS:-20}
-      SAMPLE_RATE: ${SAMPLE_RATE:-16000}
-      HF_HOME: /models/huggingface
-    volumes:
-      - model-cache:/models
-      - ./benchmark/samples:/samples:ro
 
 volumes:
   app-data:

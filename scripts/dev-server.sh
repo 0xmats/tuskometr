@@ -6,7 +6,7 @@ frontend_host="${TUSKOMETR_FRONTEND_HOST:-127.0.0.1}"
 frontend_port="${TUSKOMETR_FRONTEND_PORT:-3003}"
 
 if [[ ! -x "${repo_root}/frontend/node_modules/.bin/vite" ]]; then
-  echo "Brak zależności frontendu. Uruchom: npm --prefix frontend install" >&2
+  echo "Frontend dependencies are missing. Run: npm --prefix frontend install" >&2
   exit 1
 fi
 
@@ -15,7 +15,6 @@ compose=(
   docker compose
   --project-name tuskometr-dev
   --file "${repo_root}/docker-compose.yml"
-  --file "${repo_root}/docker-compose.dev.yml"
 )
 
 stop_children() {
