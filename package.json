@@ -1,0 +1,29 @@
+{
+  "name": "tuskometr-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "bash scripts/dev-server.sh",
+    "dev:web": "npm run dev --workspace @tuskometr/web --",
+    "dev:api": "docker compose up --build web publisher worker backup",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "docker build --target runtime -t tuskometr:dev .",
+    "build:web": "npm run build --workspace @tuskometr/web",
+    "check": "npm run typecheck && npm test",
+    "typecheck": "npm run typecheck --workspace @tuskometr/web",
+    "api:install": "bash scripts/python.sh -m pip install -e ./apps/api[dev]",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "bash scripts/python.sh -m pytest apps/api/tests",
+    "test:web": "npm run test:data --workspace @tuskometr/web",
+    "start": "docker compose up -d --build",
+    "stop": "docker compose down",
+    "prod:up": "docker compose -f docker-compose.prod.yml up -d --build",
+    "prod:logs": "docker compose -f docker-compose.prod.yml logs -f"
+  }
+}

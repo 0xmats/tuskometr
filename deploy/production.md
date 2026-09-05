@@ -11,7 +11,7 @@
    origin** for browser TTL. Do not override TTLs or cache errors.
 4. Create bucket-scoped S3 read/write credentials for the publisher.
 5. Create a Pages Direct Upload project with production branch `main`.
-   Actions builds and uploads `frontend/dist`. If the project already uses Git
+   Actions builds and uploads `apps/web/dist`. If the project already uses Git
    integration, disable automatic deployments to avoid bypassing release checks.
 
 ## VPS
@@ -53,7 +53,7 @@ References: [Pages](https://developers.cloudflare.com/pages/framework-guides/dep
 ## GitHub Actions release
 
 `Checks` runs on pushes to `main` and pull requests. To deploy, open **Actions →
-Release production → Run workflow → main**. It reruns tests, pushes an amd64 image
+Build, Test and Deploy → Run workflow → main**. It reruns tests, pushes an amd64 image
 to GHCR, deploys the VPS by image digest, checks R2 publication, then uploads Pages.
 A failed backend deployment prevents the Pages upload. These two deployments are
 not atomic; if Pages fails, rerun the workflow. There is no automatic database rollback.

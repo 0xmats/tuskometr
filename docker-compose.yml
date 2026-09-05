@@ -26,8 +26,8 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/tuskometr.db
     volumes:
-      - ./backend/alembic:/app/backend/alembic:ro
-      - ./backend/alembic.ini:/app/backend/alembic.ini:ro
+      - ./apps/api/alembic:/app/apps/api/alembic:ro
+      - ./apps/api/alembic.ini:/app/apps/api/alembic.ini:ro
       - app-data:/data
 
   publisher:
@@ -45,7 +45,7 @@ services:
       DASHBOARD_MAX_STALE_SECONDS: ${DASHBOARD_MAX_STALE_SECONDS:-120}
       DASHBOARD_RETENTION_SECONDS: ${DASHBOARD_RETENTION_SECONDS:-900}
     volumes:
-      - ./backend/app:/app/backend/app:ro
+      - ./apps/api/app:/app/apps/api/app:ro
       - app-data:/data
       - dashboard-data:/snapshots
 
@@ -81,7 +81,7 @@ services:
       YTDLP_COOKIES_FILE: ${YTDLP_COOKIES_FILE:-}
       HF_HOME: /models/huggingface
     volumes:
-      - ./backend/app:/app/backend/app:ro
+      - ./apps/api/app:/app/apps/api/app:ro
       - app-data:/data
       - model-cache:/models
 

@@ -1,4 +1,4 @@
-name: Release production
+name: Build, Test and Deploy
 run-name: Production release ${{ github.sha }}
 on:
   workflow_dispatch:
@@ -81,8 +81,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm --prefix frontend ci && npm --prefix frontend run build
+          cache-dependency-path: package-lock.json
+      - run: npm ci && npm run build:web
       - name: Upload release files
         run: |
           remote="$VPS_USER@$VPS_HOST"
@@ -101,7 +101,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy frontend/dist --project-name=${{ env.CLOUDFLARE_PAGES_PROJECT }} --branch=main --commit-hash=${{ github.sha }}
+          command: pages deploy apps/web/dist --project-name=${{ env.CLOUDFLARE_PAGES_PROJECT }} --branch=main --commit-hash=${{ github.sha }}
       - name: Release summary
         run: |
           {

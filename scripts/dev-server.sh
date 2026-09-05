@@ -5,8 +5,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 frontend_host="${TUSKOMETR_FRONTEND_HOST:-127.0.0.1}"
 frontend_port="${TUSKOMETR_FRONTEND_PORT:-3003}"
 
-if [[ ! -x "${repo_root}/frontend/node_modules/.bin/vite" ]]; then
-  echo "Frontend dependencies are missing. Run: npm --prefix frontend install" >&2
+if [[ ! -x "${repo_root}/node_modules/.bin/vite" ]]; then
+  echo "Frontend dependencies are missing. Run: npm ci" >&2
   exit 1
 fi
 
@@ -31,7 +31,7 @@ trap 'exit 143' INT TERM
 "${compose[@]}" up --build --remove-orphans web publisher worker backup &
 children+=("$!")
 
-npm --prefix "${repo_root}/frontend" run dev -- \
+npm --prefix "${repo_root}" run dev:web -- \
   --host "${frontend_host}" \
   --port "${frontend_port}" \
   --strictPort &
