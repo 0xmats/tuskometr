@@ -1,27 +1,52 @@
 services:
   web:
-    build: .
-    image: tuskometr:local
+    build:
+      context: .
+      target: web
+    image: tuskometr-web:local
     restart: unless-stopped
-    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
-    environment:
-      DATABASE_URL: sqlite:////data/tuskometr.db
-      FRONTEND_DIST: /app/static
-      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Warsaw}
     volumes:
-      - app-data:/data
+      - dashboard-data:/snapshots:ro
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8000/healthz"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 15s
       timeout: 5s
       retries: 5
+
+  migrate:
+    build:
+      context: .
+      target: runtime
+    image: tuskometr:local
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: sqlite:////data/tuskometr.db
+    volumes:
+      - app-data:/data
+
+  publisher:
+    image: tuskometr:local
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.publisher"]
+    environment:
+      DATABASE_URL: sqlite:////data/tuskometr.db
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Warsaw}
+      DASHBOARD_REFRESH_SECONDS: ${DASHBOARD_REFRESH_SECONDS:-30}
+      DASHBOARD_MAX_STALE_SECONDS: ${DASHBOARD_MAX_STALE_SECONDS:-120}
+      DASHBOARD_RETENTION_SECONDS: ${DASHBOARD_RETENTION_SECONDS:-900}
+    volumes:
+      - app-data:/data
+      - dashboard-data:/snapshots
 
   worker:
     image: tuskometr:local
     restart: unless-stopped
     depends_on:
-      web:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     command: ["python", "-m", "app.worker"]
     environment:
       DATABASE_URL: sqlite:////data/tuskometr.db
@@ -71,8 +96,8 @@ services:
     image: tuskometr:local
     restart: unless-stopped
     depends_on:
-      web:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     command: ["python", "-m", "app.backup"]
     environment:
       DATABASE_URL: sqlite:////data/tuskometr.db
@@ -84,7 +109,9 @@ services:
 
   benchmark:
     profiles: ["tools"]
-    build: .
+    build:
+      context: .
+      target: runtime
     image: tuskometr:local
     entrypoint: ["python", "-m", "app.benchmark"]
     environment:
@@ -107,3 +134,4 @@ volumes:
   caddy-data:
   caddy-config:
   backup-data:
+  dashboard-data:

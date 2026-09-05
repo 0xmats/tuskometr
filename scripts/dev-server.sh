@@ -29,7 +29,7 @@ stop_children() {
 trap stop_children EXIT
 trap 'exit 143' INT TERM
 
-"${compose[@]}" up --build --remove-orphans web worker backup &
+"${compose[@]}" up --build --remove-orphans web publisher worker backup &
 children+=("$!")
 
 npm --prefix "${repo_root}/frontend" run dev -- \

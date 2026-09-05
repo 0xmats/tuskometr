@@ -1,0 +1,14 @@
+# Use together with docker-compose.yml. No public web services are started.
+services:
+  web:
+    profiles: [local-web]
+  caddy:
+    profiles: [local-web]
+  publisher:
+    environment:
+      DASHBOARD_STORAGE: r2
+      R2_ENDPOINT_URL: ${R2_ENDPOINT_URL:?Set R2_ENDPOINT_URL}
+      R2_BUCKET: ${R2_BUCKET:?Set R2_BUCKET}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?Set R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set R2_SECRET_ACCESS_KEY}
+      R2_RETENTION_SECONDS: ${R2_RETENTION_SECONDS:-86400}

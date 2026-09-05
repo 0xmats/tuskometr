@@ -10,7 +10,7 @@ export type Occurrence = {
 
 export type OccurrencePage = {
   items: Occurrence[]
-  nextCursor: number | null
+  nextPage: string | null
 }
 
 export type Stats = {
@@ -39,28 +39,80 @@ export type PipelineStatus = {
   updatedAt: string
 }
 
+const dataOrigin = (import.meta.env.VITE_DATA_ORIGIN ?? "").replace(/\/$/, "")
+
+function dataUrl(path: string): string {
+  if (!path.startsWith("/dashboard/")) throw new Error("Nieprawidłowy adres danych")
+  return `${dataOrigin}${path}`
+}
+
 async function request<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: { Accept: "application/json" } })
+  const response = await fetch(dataUrl(url), { headers: { Accept: "application/json" } })
   if (!response.ok) {
     throw new Error(`API zwróciło ${response.status}`)
   }
   return response.json() as Promise<T>
 }
 
-export function fetchOccurrences(rangeStart: Date, cursor?: number): Promise<OccurrencePage> {
-  const params = new URLSearchParams({ from: rangeStart.toISOString(), limit: "30" })
-  if (cursor) params.set("cursor", String(cursor))
-  return request(`/api/occurrences?${params}`)
+export type Dashboard = {
+  historyPages?: string[]
+  generatedAt: string
+  stats: Stats
+  status: PipelineStatus
+  occurrences: OccurrencePage
 }
 
-export function fetchStats(rangeStart: Date, bucket: "hour" | "day"): Promise<Stats> {
-  const params = new URLSearchParams({
-    from: rangeStart.toISOString(),
-    bucket,
+export type Manifest = {
+  version: string
+  generatedAt: string
+  staleAfterSeconds: number
+  dashboards: Record<string, string>
+  receivedAtMs: number
+  serverTimeAtReceiptMs: number
+}
+
+export async function fetchManifest(): Promise<Manifest> {
+  const response = await fetch(dataUrl("/dashboard/manifest.json"), {
+    headers: { Accept: "application/json" },
+    // Respect the manifest's short TTL in both the browser and the CDN.
+    cache: "default",
   })
-  return request(`/api/stats?${params}`)
+  if (!response.ok) throw new Error(`Manifest zwrócił ${response.status}`)
+  const manifest = await response.json() as Manifest
+  const serverDate = Date.parse(response.headers.get("Date") ?? "")
+  const ageSeconds = Number(response.headers.get("Age") ?? 0)
+  if (!Number.isFinite(serverDate) || !Number.isFinite(ageSeconds)) {
+    throw new Error("Nie można ustalić czasu publikacji danych")
+  }
+  return {
+    ...manifest,
+    receivedAtMs: performance.now(),
+    serverTimeAtReceiptMs: serverDate + Math.max(0, ageSeconds) * 1000,
+  }
 }
 
-export function fetchStatus(): Promise<PipelineStatus> {
-  return request("/api/status")
+export function dashboardIsStale(dashboard: Dashboard, manifest: Manifest, nowMs: number): boolean {
+  // Both timestamps use the server's clock; elapsed time is monotonic and does
+  // not depend on the user's clock, time zone or clock corrections.
+  const serverNow = manifest.serverTimeAtReceiptMs + Math.max(0, nowMs - manifest.receivedAtMs)
+  return serverNow - Date.parse(dashboard.generatedAt) > manifest.staleAfterSeconds * 1000
+}
+
+export async function fetchDashboard(url: string): Promise<Dashboard> {
+  const [path, fragment] = url.split("#")
+  const dashboard = await request<Dashboard>(path)
+  if (!dashboard.historyPages) return dashboard
+  const page = fragment ? Number(fragment) : 0
+  if (!Number.isInteger(page) || page < 0 || page > dashboard.historyPages.length) {
+    throw new Error("Nieprawidłowa strona historii")
+  }
+  const items = page === 0 ? dashboard.occurrences.items
+    : (await request<{ items: Occurrence[] }>(dashboard.historyPages[page - 1])).items
+  return {
+    ...dashboard,
+    occurrences: {
+      items,
+      nextPage: page < dashboard.historyPages.length ? `${path}#${page + 1}` : null,
+    },
+  }
 }

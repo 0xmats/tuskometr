@@ -1,0 +1,7 @@
+# Combine with the base Compose file (and optionally docker-compose.r2.yml).
+services:
+  backup:
+    env_file:
+      - ${TUSKOMETR_BACKUP_ENV_FILE:-./deploy/backup.env}
+    environment:
+      BACKUP_REMOTE_ENABLED: "true"

@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react"
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect, useRef, useState } from "react"
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import {
   Activity,
   ArrowUpRight,
@@ -18,13 +18,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useLiveEvents } from "@/hooks/use-live-events"
 import { useYouTubeTimelineOrigin } from "@/hooks/use-youtube-timeline"
 import {
-  fetchOccurrences,
-  fetchStats,
-  fetchStatus,
+  fetchDashboard,
+  fetchManifest,
+  dashboardIsStale,
   type Occurrence,
+  type Dashboard,
   type PipelineStatus,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -45,9 +45,6 @@ const SOURCE_VIDEO_ID = "dzntyCTgJMQ"
 const YOUTUBE_DVR_SECONDS = 12 * 60 * 60
 const LINK_PREROLL_SECONDS = 3
 
-function rangeStart(days: number) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-}
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("pl-PL", {
@@ -184,34 +181,54 @@ function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrig
 
 function App() {
   const [days, setDays] = useState(7)
-  const [liveStatus, setLiveStatus] = useState<PipelineStatus | undefined>()
-  const queryClient = useQueryClient()
+  const [now, setNow] = useState(() => performance.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(performance.now()), 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const manifestQuery = useQuery({
+    queryKey: ["manifest"],
+    queryFn: fetchManifest,
+    refetchInterval: 15_000,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+  })
+  const manifest = manifestQuery.data
   const timelineOrigin = useYouTubeTimelineOrigin(SOURCE_VIDEO_ID)
-  const start = useMemo(() => rangeStart(days), [days])
-  const bucket = days === 1 ? "hour" : "day"
-
-  const statusQuery = useQuery({
-    queryKey: ["status"],
-    queryFn: fetchStatus,
-    refetchInterval: 10_000,
-  })
-  const statsQuery = useQuery({
-    queryKey: ["stats", days],
-    queryFn: () => fetchStats(start, bucket),
-    refetchInterval: 30_000,
-  })
   const occurrencesQuery = useInfiniteQuery({
-    queryKey: ["occurrences", days],
-    queryFn: ({ pageParam }) => fetchOccurrences(start, pageParam),
-    initialPageParam: undefined as number | undefined,
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    queryKey: ["dashboard", days, manifest?.version],
+    queryFn: ({ pageParam }) => fetchDashboard(pageParam),
+    initialPageParam: manifest?.dashboards[String(days)] ?? "",
+    getNextPageParam: (page) => page.occurrences.nextPage ?? undefined,
+    enabled: Boolean(manifest?.dashboards[String(days)]),
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
+    gcTime: 60_000,
   })
 
-  const handleStatus = useCallback((status: PipelineStatus) => setLiveStatus(status), [])
-  useLiveEvents(handleStatus)
-  const status = liveStatus ?? statusQuery.data
+  const lastGoodPages = useRef<Dashboard[]>([])
+  useEffect(() => {
+    if (occurrencesQuery.data && !occurrencesQuery.isPlaceholderData) {
+      lastGoodPages.current = occurrencesQuery.data.pages
+    }
+  }, [occurrencesQuery.data, occurrencesQuery.isPlaceholderData])
+  const pages = occurrencesQuery.data?.pages ?? lastGoodPages.current
+  const dashboard = pages[0]
+  const statsQuery = {
+    ...occurrencesQuery, data: dashboard?.stats,
+    isLoading: !dashboard && (manifestQuery.isPending || occurrencesQuery.isPending),
+  }
+  const refreshFailed = manifestQuery.isError || occurrencesQuery.isError
+  const snapshotExpired = dashboard != null && manifest != null &&
+    dashboardIsStale(dashboard, manifest, now)
+  const dataIsStale = refreshFailed || snapshotExpired
+  const status = dataIsStale ? undefined : dashboard?.status
   const statusView = statusPresentation(status)
-  const occurrences = occurrencesQuery.data?.pages.flatMap((page) => page.items) ?? []
+  const occurrences = [...new Map(
+    pages.flatMap((page) => page.occurrences.items)
+      .map((item) => [item.id, item]),
+  ).values()]
   const chartData =
     statsQuery.data?.buckets.map((item) => ({
       label: formatBucket(item.start, days),
@@ -219,7 +236,8 @@ function App() {
     })) ?? []
 
   const refresh = () => {
-    void queryClient.invalidateQueries()
+    void manifestQuery.refetch()
+    if (occurrencesQuery.isError) void occurrencesQuery.refetch()
   }
 
   return (
@@ -255,7 +273,7 @@ function App() {
               Ile razy padło nazwisko <span className="text-primary">Tusk?</span>
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground md:text-base">
-              Wykryte odmiany nazwiska w transmisji Telewizji Republika. Dane pojawiają się z opóźnieniem do około minuty.
+              Wykryte odmiany nazwiska w transmisji Telewizji Republika. Statystyki odświeżamy co 30 sekund; transkrypcja wprowadza dodatkowe opóźnienie.
             </p>
           </div>
           <div className="flex w-fit rounded-xl border border-white/[0.08] bg-white/[0.03] p-1">
@@ -272,6 +290,13 @@ function App() {
           </div>
         </section>
 
+        {dataIsStale && (
+          <p role="status" className="mb-4 text-sm text-amber-400">
+            {refreshFailed
+              ? "Nie udało się pobrać nowych danych. Wyświetlamy ostatnie dostępne statystyki."
+              : "Generator nie opublikował świeżych danych. Wyświetlane statystyki mogą być nieaktualne."}
+          </p>
+        )}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Dzisiaj" value={statsQuery.data?.summary.today} detail="od północy czasu polskiego" icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={statsQuery.data?.summary.last24Hours} detail="ruchome okno dobowe" icon={Activity} />
@@ -358,7 +383,7 @@ function App() {
               </div>
             </CardHeader>
             <CardContent>
-              {occurrencesQuery.isLoading ? (
+              {statsQuery.isLoading ? (
                 <div className="space-y-4 py-5">
                   {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 w-full" />)}
                 </div>
@@ -370,7 +395,7 @@ function App() {
                       <Button
                         variant="outline"
                         onClick={() => occurrencesQuery.fetchNextPage()}
-                        disabled={occurrencesQuery.isFetchingNextPage}
+                        disabled={occurrencesQuery.isFetchingNextPage || occurrencesQuery.isPlaceholderData}
                       >
                         {occurrencesQuery.isFetchingNextPage ? <RefreshCw className="size-4 animate-spin" /> : <ArrowUpRight className="size-4" />}
                         Pokaż starsze
@@ -391,9 +416,20 @@ function App() {
           </Card>
         </section>
 
-        <footer className="flex flex-col gap-2 py-8 text-xs leading-5 text-muted-foreground md:flex-row md:items-center md:justify-between">
-          <p>Transkrypcja jest generowana automatycznie i może zawierać błędy.</p>
-          <p>Źródło: publiczna transmisja Telewizji Republika w YouTube.</p>
+        <footer className="py-8 text-xs leading-5 text-muted-foreground">
+          <section aria-labelledby="about-project" className="max-w-3xl space-y-2">
+            <h2 id="about-project" className="text-sm font-medium text-foreground">O projekcie</h2>
+            <p>
+              Tuskometr jest niezależnym projektem analizy przekazu medialnego. Pokazuje częstotliwość
+              występowania nazwiska „Tusk” w monitorowanej transmisji Telewizji Republika.
+            </p>
+            <p>
+              Krótkie fragmenty automatycznej transkrypcji ilustrują wykryte wystąpienia; odnośniki
+              prowadzą do materiału źródłowego. Wyniki dotyczą przetworzonego materiału i mogą
+              zawierać błędy lub luki. Projekt nie jest powiązany z Telewizją Republika ani YouTube.
+            </p>
+            <p>Źródło: publiczna transmisja Telewizji Republika w YouTube.</p>
+          </section>
         </footer>
       </main>
     </div>

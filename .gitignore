@@ -18,3 +18,5 @@ benchmark/samples/*
 !benchmark/samples/truth.example.json
 benchmark/reports/*
 !benchmark/reports/.gitkeep
+# Private off-site backup credentials.
+deploy/backup.env

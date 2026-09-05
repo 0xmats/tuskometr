@@ -1,16 +1,18 @@
 services:
   web:
-    command:
-      - sh
-      - -c
-      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8000:8080"
     volumes:
-      - app-data:/data
-      - ./backend/app:/app/app:ro
+      - ./deploy/Caddyfile.web:/etc/caddy/Caddyfile:ro
+
+  migrate:
+    volumes:
       - ./backend/alembic:/app/alembic:ro
       - ./backend/alembic.ini:/app/alembic.ini:ro
+
+  publisher:
+    volumes:
+      - ./backend/app:/app/app:ro
 
   worker:
     volumes:

@@ -8,14 +8,13 @@ version = "0.1.0"
 description = "Live Polish TV transcription and Tusk surname occurrence tracker"
 requires-python = ">=3.12"
 dependencies = [
+  "boto3>=1.36,<2",
   "alembic>=1.16,<2",
-  "fastapi>=0.116,<1",
   "faster-whisper>=1.2,<2",
   "httpx>=0.28,<1",
   "numpy>=2.0,<3",
   "pydantic-settings>=2.10,<3",
   "sqlalchemy>=2.0,<3",
-  "uvicorn[standard]>=0.35,<1",
   "yt-dlp>=2025.8.27",
 ]
 

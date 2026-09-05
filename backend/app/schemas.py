@@ -66,3 +66,10 @@ class StatusResponse(ApiModel):
     message: str | None = None
     model_name: str | None = Field(default=None, serialization_alias="modelName")
     updated_at: datetime = Field(serialization_alias="updatedAt")
+
+
+class DashboardResponse(ApiModel):
+    generated_at: datetime = Field(serialization_alias="generatedAt")
+    stats: StatsResponse
+    status: StatusResponse
+    occurrences: OccurrencePage

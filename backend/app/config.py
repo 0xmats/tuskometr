@@ -41,7 +41,23 @@ class Settings(BaseSettings):
     ytdlp_cookies_file: Path | None = None
 
     frontend_dist: Path = Path("/app/static")
-    api_poll_seconds: float = Field(default=2.0, ge=0.5, le=30)
+    dashboard_storage: Literal["local", "r2"] = "local"
+    r2_endpoint_url: str = ""
+    r2_bucket: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: SecretStr = SecretStr("")
+    r2_retention_seconds: int = Field(default=86400, ge=3600)
+    dashboard_refresh_seconds: float = Field(default=30, ge=5, le=300)
+    dashboard_output_dir: Path = Path("/snapshots")
+    dashboard_retention_seconds: float = Field(default=900, ge=600, le=86400)
+    dashboard_max_stale_seconds: float = Field(default=120, ge=30, le=900)
+
+    @field_validator("dashboard_max_stale_seconds")
+    @classmethod
+    def stale_must_exceed_refresh(cls, value, info):
+        if value <= info.data.get("dashboard_refresh_seconds", 30):
+            raise ValueError("DASHBOARD_MAX_STALE_SECONDS musi przekraczać czas odświeżania")
+        return value
 
     @field_validator("chunk_step_seconds")
     @classmethod
