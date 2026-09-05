@@ -75,8 +75,10 @@ Create the GitHub environment `production` with these settings:
 The VPS must be amd64 with Docker Compose, Bash and `flock`. Provision
 `/opt/tuskometr`, owned by the deployment user. Store runtime settings in
 `/opt/tuskometr/.env` and backup credentials in `/opt/tuskometr/deploy/backup.env`.
-Initialize the backup repository once using the backup setup instructions before
-starting the first release. Do not add runtime R2/OVH credentials to GitHub.
+For a new empty backup repository, select `initialize_backups` when running the
+first release. Leave it disabled for subsequent releases or an existing repository.
+Actions initializes backups using the pulled image; no checkout or build is needed
+on the VPS. Do not add runtime R2/OVH credentials to GitHub.
 An address available only inside Tailscale is not reachable from this runner setup.
 Verify the SSH host key through your existing trusted connection or VPS console.
 

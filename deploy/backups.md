@@ -9,13 +9,17 @@ keeps the last 10 snapshots, 14 daily and 8 weekly snapshots.
 
 Create a private R2 Standard bucket with bucket-scoped S3 read/write credentials.
 Do not enable public access or lifecycle deletion. Copy `backup.env.example` to
-`backup.env`, fill in the credentials and a strong `RESTIC_PASSWORD`, then:
+`/opt/tuskometr/deploy/backup.env`, fill in the credentials and a strong
+`RESTIC_PASSWORD`, then:
 
 ```bash
-chmod 600 deploy/backup.env
-docker compose -f docker-compose.prod.yml build migrate
-docker compose -f docker-compose.prod.yml run --rm --no-deps backup python -m app.backup init
+chmod 600 /opt/tuskometr/deploy/backup.env
 ```
+
+Run the GitHub Actions release with `initialize_backups` selected for this new
+repository. Initialization uses the pulled image before services are stopped;
+no source checkout or build is needed on the VPS. Leave the option disabled on
+later releases. Initialization fails if the repository already exists.
 
 Keep the password outside the VPS; losing it makes backups unrecoverable.
 Keep `BACKUP_RESTIC_HOST` and the repository address stable across deployments.

@@ -4,6 +4,8 @@ release_dir="$(cd "$(dirname "$0")/.." && pwd)"
 root=/opt/tuskometr
 image="${1:?Pass the GHCR image digest}"
 registry_user="${2:?Pass the GHCR user}"
+initialize_backups="${3:-false}"
+[[ "$initialize_backups" == true || "$initialize_backups" == false ]]
 [[ "$release_dir" =~ ^/opt/tuskometr/releases/[a-f0-9]{40}$ ]]
 [[ "$image" =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
 [[ "$registry_user" =~ ^[A-Za-z0-9_-]+(\[bot\])?$ ]]
@@ -23,6 +25,9 @@ docker login ghcr.io --username "$registry_user" --password-stdin
 compose=(docker compose -f docker-compose.prod.yml)
 "${compose[@]}" config --quiet
 "${compose[@]}" pull
+if [[ "$initialize_backups" == true ]]; then
+  "${compose[@]}" run --rm --no-deps backup python -m app.backup init
+fi
 # Check the existing private backup repository before changing running services.
 "${compose[@]}" run --rm --no-deps backup python -m app.backup list
 "${compose[@]}" stop worker publisher backup

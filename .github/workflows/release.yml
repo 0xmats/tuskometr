@@ -2,6 +2,11 @@ name: Build, Test and Deploy
 run-name: Production release ${{ github.sha }}
 on:
   workflow_dispatch:
+    inputs:
+      initialize_backups:
+        description: Initialize a new empty backup repository (first deployment only)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -93,9 +98,10 @@ jobs:
       - name: Deploy backend
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INITIALIZE_BACKUPS: ${{ inputs.initialize_backups }}
         run: |
           printf '%s' "$GHCR_TOKEN" | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$VPS_PORT" \
-            "$VPS_USER@$VPS_HOST" "bash /opt/tuskometr/releases/$GITHUB_SHA/scripts/deploy-production.sh '$IMAGE' '$GITHUB_ACTOR'"
+            "$VPS_USER@$VPS_HOST" "bash /opt/tuskometr/releases/$GITHUB_SHA/scripts/deploy-production.sh '$IMAGE' '$GITHUB_ACTOR' '$INITIALIZE_BACKUPS'"
       - name: Deploy Pages
         uses: cloudflare/wrangler-action@v3
         with:
