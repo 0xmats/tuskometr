@@ -1,0 +1,13 @@
+{
+  "toleranceSeconds": 1.5,
+  "occurrences": [
+    {
+      "positionSeconds": 12.4,
+      "form": "Tusk"
+    },
+    {
+      "positionSeconds": 48.9,
+      "form": "Tuska"
+    }
+  ]
+}

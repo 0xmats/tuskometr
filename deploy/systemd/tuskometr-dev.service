@@ -1,0 +1,25 @@
+[Unit]
+Description=Tuskometr development server
+Wants=network-online.target
+After=network-online.target docker.service tailscaled.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/sati/repos/tuskometr
+Environment=PATH=/home/sati/.local/bin:/home/sati/.nvm/versions/node/v24.19.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=SOURCE_MODE=youtube
+Environment=SOURCE_URL=https://www.youtube.com/watch?v=dzntyCTgJMQ
+Environment=ASR_MODEL=small
+Environment=ASR_FALLBACK_MODEL=base
+Environment=ASR_DEVICE=cpu
+Environment=ASR_COMPUTE_TYPE=int8
+Environment=ASR_CPU_THREADS=4
+Environment=TUSKOMETR_FRONTEND_HOST=100.80.64.94
+Environment=TUSKOMETR_FRONTEND_PORT=3003
+ExecStart=/home/sati/repos/tuskometr/scripts/dev-server.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
