@@ -6,6 +6,14 @@ A live dashboard counting mentions of “Tusk” in a Polish TV stream.
 - **Production:** the VPS processes audio and uploads JSON to R2; Cloudflare Pages hosts the frontend.
 - SQLite keeps transcripts for 30 days and detected mentions indefinitely. Audio is not stored.
 
+The dashboard lists mentions by broadcast time, newest first, including backfilled
+results. Clicking a chart bar (or choosing its interval from the list) shows all
+mentions in that interval; “Wróć do live” restores the current list. The last-hour
+chart uses minute buckets. The 7- and 30-day ranges appear once the stored history
+spans those periods. Publishers include static per-bucket pages, so filtering does
+not query the production database. Deploy both publisher and frontend for these
+features; no database migration is needed.
+
 ## Recovery after interruptions
 
 YouTube ingestion uses its DVR window by default (`YOUTUBE_DVR_ENABLED=true`,

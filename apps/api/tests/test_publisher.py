@@ -84,7 +84,7 @@ def read_url(root, url):
 def test_publication_and_reads_without_database(database, tmp_path):
     factory, reads = database
     snapshot = build_snapshot(Settings(_env_file=None), factory)
-    assert len(reads) == 3
+    assert len(reads) == 4
     manifest = publish(snapshot, tmp_path)
     reads.clear()
     for _ in range(100):
@@ -246,3 +246,104 @@ def test_hourly_count_boundaries(database, seconds_ago, expected):
     snapshot = build_snapshot(Settings(_env_file=None), factory, now=now)
     for days in (1, 7, 30):
         assert json.loads(snapshot.stats[days])["summary"]["lastHour"] == expected
+
+
+@pytest.fixture
+def backfilled_snapshot(database):
+    factory, _ = database
+    now = datetime(2026, 9, 6, 13, 30, tzinfo=UTC)
+    # Later inserts include old audio and equal timestamps, across page boundaries.
+    offsets = [5, 120, 70, 70, 1, 59, 60, 61] * 9
+    with factory() as db:
+        db.query(Occurrence).delete()
+        for i, minutes in enumerate(offsets):
+            db.add(
+                Occurrence(
+                    source_session_id=1,
+                    occurred_at=now - timedelta(minutes=minutes),
+                    source_sample=1000 + i,
+                    form="Tusk",
+                    normalized_form="tusk",
+                    quote="Tusk",
+                    confidence=0.9,
+                )
+            )
+        db.commit()
+    return build_snapshot(Settings(_env_file=None), factory, now=now)
+
+
+def assert_chronological(items):
+    keys = [(datetime.fromisoformat(item["occurredAt"]), item["id"]) for item in items]
+    assert keys == sorted(keys, reverse=True)
+    assert len({item["id"] for item in items}) == len(items)
+
+
+def assert_bucket_pages(dashboard, read):
+    for bucket in dashboard["stats"]["buckets"]:
+        items = [
+            item for url in dashboard["bucketPages"][bucket["start"]] for item in read(url)["items"]
+        ]
+        assert len(items) == bucket["count"]
+        assert_chronological(items)
+        assert all(
+            datetime.fromisoformat(bucket["start"])
+            <= datetime.fromisoformat(item["occurredAt"])
+            < datetime.fromisoformat(bucket["end"])
+            for item in items
+        )
+
+
+def test_backfill_order_pagination_and_bucket_filter(backfilled_snapshot, tmp_path):
+    cursor_ids = []
+    page = backfilled_snapshot.page(1)
+    while True:
+        cursor_ids.extend(item.id for item in page.items)
+        if page.next_cursor is None:
+            break
+        page = backfilled_snapshot.page(1, page.next_cursor)
+    assert cursor_ids == [item.id for item in backfilled_snapshot.occurrences[1]]
+    manifest = publish(backfilled_snapshot, tmp_path)
+    dashboard = read_url(tmp_path, manifest["dashboards"]["1"])
+    items = []
+    page = dashboard
+    while True:
+        items.extend(page["occurrences"]["items"])
+        if not page["occurrences"]["nextPage"]:
+            break
+        page = read_url(tmp_path, page["occurrences"]["nextPage"])
+    assert len(items) == 72
+    assert_chronological(items)
+    assert max(bucket["count"] for bucket in dashboard["stats"]["buckets"]) > 30
+    for url in manifest["dashboards"].values():
+        assert_bucket_pages(read_url(tmp_path, url), lambda url: read_url(tmp_path, url))
+    hour = read_url(tmp_path, manifest["dashboards"]["0"])
+    assert hour["stats"]["range"]["total"] == 36  # Includes exactly 60 minutes ago.
+    assert all(
+        datetime.fromisoformat(b["end"]) - datetime.fromisoformat(b["start"])
+        == timedelta(minutes=1)
+        for b in hour["stats"]["buckets"]
+    )
+
+
+def test_history_age_includes_transcripts_without_mentions(database):
+    from app.models import TranscriptSegment
+
+    factory, _ = database
+    now = datetime.now(UTC)
+    oldest = now - timedelta(days=8)
+    with factory() as db:
+        db.add(
+            TranscriptSegment(
+                source_session_id=1,
+                started_at=oldest,
+                ended_at=oldest + timedelta(seconds=25),
+                start_sample=0,
+                end_sample=400000,
+                text="Wiadomości",
+                checksum="test",
+                expires_at=now + timedelta(days=1),
+            )
+        )
+        db.commit()
+    stats = json.loads(build_snapshot(Settings(_env_file=None), factory, now=now).stats[7])
+    assert datetime.fromisoformat(stats["historyStartedAt"]) == oldest

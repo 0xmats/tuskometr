@@ -58,6 +58,18 @@ def publish(snapshot: Snapshot, root: Path, stale_seconds: float = 120) -> dict:
             pages = max(1, (len(items) + PAGE_SIZE - 1) // PAGE_SIZE)
             prefix = f"/dashboard/versions/{version}/{days}"
             manifest["dashboards"][str(days)] = f"{prefix}-0.json"
+            bucket_pages = {}
+            for index, (start, selected) in enumerate(snapshot.bucket_items(days).items()):
+                urls = []
+                for offset in range(0, len(selected), PAGE_SIZE):
+                    name = f"{days}-bucket-{index}-{offset // PAGE_SIZE}.json"
+                    write_json(staging / name, {"items": [
+                        item.model_dump(mode="json", by_alias=True)
+                        for item in selected[offset:offset + PAGE_SIZE]
+                    ]})
+                    urls.append(f"/dashboard/versions/{version}/{name}")
+                bucket_pages[start] = urls
+            base["bucketPages"] = bucket_pages
             for page in range(pages):
                 selected = items[page * PAGE_SIZE : (page + 1) * PAGE_SIZE]
                 payload = {

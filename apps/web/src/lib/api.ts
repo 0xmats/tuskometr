@@ -26,7 +26,7 @@ export type Stats = {
     to: string
     total: number
   }
-  buckets: Array<{ start: string; count: number }>
+  buckets: Array<{ start: string; end: string; count: number }>
   forms: Array<{ form: string; count: number }>
 }
 
@@ -48,8 +48,8 @@ function dataUrl(path: string): string {
   return `${dataOrigin}${path}`
 }
 
-async function request<T>(url: string): Promise<T> {
-  const response = await fetch(dataUrl(url), { headers: { Accept: "application/json" } })
+async function request<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(dataUrl(url), { headers: { Accept: "application/json" }, signal })
   if (!response.ok) {
     throw new Error(`API zwróciło ${response.status}`)
   }
@@ -58,6 +58,7 @@ async function request<T>(url: string): Promise<T> {
 
 export type Dashboard = {
   historyPages?: string[]
+  bucketPages?: Record<string, string[]>
   generatedAt: string
   stats: Stats
   status: PipelineStatus
@@ -100,16 +101,16 @@ export function dashboardIsStale(dashboard: Dashboard, manifest: Manifest, nowMs
   return serverNow - Date.parse(dashboard.generatedAt) > manifest.staleAfterSeconds * 1000
 }
 
-export async function fetchDashboard(url: string): Promise<Dashboard> {
+export async function fetchDashboard(url: string, signal?: AbortSignal): Promise<Dashboard> {
   const [path, fragment] = url.split("#")
-  const dashboard = await request<Dashboard>(path)
+  const dashboard = await request<Dashboard>(path, signal)
   if (!dashboard.historyPages) return dashboard
   const page = fragment ? Number(fragment) : 0
   if (!Number.isInteger(page) || page < 0 || page > dashboard.historyPages.length) {
     throw new Error("Nieprawidłowa strona historii")
   }
   const items = page === 0 ? dashboard.occurrences.items
-    : (await request<{ items: Occurrence[] }>(dashboard.historyPages[page - 1])).items
+    : (await request<{ items: Occurrence[] }>(dashboard.historyPages[page - 1], signal)).items
   return {
     ...dashboard,
     occurrences: {
@@ -117,4 +118,50 @@ export async function fetchDashboard(url: string): Promise<Dashboard> {
       nextPage: page < dashboard.historyPages.length ? `${path}#${page + 1}` : null,
     },
   }
+}
+
+
+export function sortOccurrences(items: Occurrence[]): Occurrence[] {
+  return [...new Map(items.map((item) => [item.id, item])).values()]
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id - a.id)
+}
+
+export function rangeAvailable(days: number, stats: Stats | undefined, generatedAt?: string): boolean {
+  if (days < 7) return true
+  if (!stats?.historyStartedAt || !generatedAt) return false
+  return Date.parse(generatedAt) - Date.parse(stats.historyStartedAt) >= days * 86_400_000
+}
+
+export async function fetchBucketOccurrences(
+  dashboard: Dashboard, start: string, end: string, signal?: AbortSignal,
+): Promise<Occurrence[]> {
+  let items: Occurrence[]
+  const urls = dashboard.bucketPages?.[start]
+  if (urls) {
+    items = []
+    for (let offset = 0; offset < urls.length; offset += 4) {
+      const pages = await Promise.all(urls.slice(offset, offset + 4)
+        .map((url) => request<{ items: Occurrence[] }>(url, signal)))
+      items.push(...pages.flatMap((page) => page.items))
+    }
+  } else {
+    // Compatibility with snapshots published before the bucket index was introduced.
+    items = [...dashboard.occurrences.items]
+    let next = dashboard.occurrences.nextPage
+    const visited = new Set<string>()
+    while (next) {
+      signal?.throwIfAborted()
+      if (visited.has(next)) throw new Error("Nieprawidłowa paginacja historii")
+      visited.add(next)
+      const page = await fetchDashboard(next, signal)
+      items.push(...page.occurrences.items)
+      next = page.occurrences.nextPage
+    }
+  }
+  const from = Date.parse(start)
+  const to = Date.parse(end)
+  return sortOccurrences(items.filter((item) => {
+    const time = Date.parse(item.occurredAt)
+    return time >= from && time < to
+  }))
 }

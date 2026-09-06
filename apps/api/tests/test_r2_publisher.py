@@ -3,7 +3,7 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest
-from test_publisher import database  # noqa: F401
+from test_publisher import backfilled_snapshot, database  # noqa: F401
 
 from app.config import Settings
 from app.r2_publisher import R2Publisher
@@ -28,8 +28,12 @@ class Store:
 
 
 def settings(path):
-    return Settings(_env_file=None, dashboard_output_dir=path,
-                    r2_bucket="test", r2_endpoint_url="https://example.com")
+    return Settings(
+        _env_file=None,
+        dashboard_output_dir=path,
+        r2_bucket="test",
+        r2_endpoint_url="https://example.com",
+    )
 
 
 def test_deduplication_restart_and_atomic_manifest(database, tmp_path):  # noqa: F811
@@ -58,22 +62,32 @@ def test_history_is_stable_on_insert_and_old_snapshot_remains_readable(database,
     store = Store()
     publisher = R2Publisher(config, store)
     snapshot = build_snapshot(config, database[0])
-    items = tuple(OccurrenceDto(
-        id=i, occurred_at=snapshot.generated_at, form="Tusk", quote="Tusk",
-        confidence=0.9, source_url="https://youtube.com/watch?v=test",
-    ) for i in range(120, 0, -1))
+    items = tuple(
+        OccurrenceDto(
+            id=i,
+            occurred_at=snapshot.generated_at,
+            form="Tusk",
+            quote="Tusk",
+            confidence=0.9,
+            source_url="https://youtube.com/watch?v=test",
+        )
+        for i in range(120, 0, -1)
+    )
     snapshot = replace(snapshot, occurrences={d: items for d in RANGES})
     first = publisher.publish(snapshot)
     old = json.loads(store.objects[first["dashboards"]["7"].lstrip("/")]["Body"])
     old_history = old["historyPages"]
     # The same history objects are shared across ranges.
-    assert len({key for key in store.writes if key.startswith("dashboard/objects/")}) == 7
+    assert (
+        len({key for key in store.writes if key.startswith("dashboard/objects/")})
+        == len(RANGES) + 5
+    )
     store.writes.clear()
     added = items[0].model_copy(update={"id": 121})
     second = publisher.publish(replace(snapshot, occurrences={d: (added, *items) for d in RANGES}))
     new = json.loads(store.objects[second["dashboards"]["7"].lstrip("/")]["Body"])
     assert new["historyPages"] == old_history
-    assert len(store.writes) == 4
+    assert len(store.writes) == len(RANGES) + 2
     ids = [x["id"] for x in old["occurrences"]["items"]]
     for url in old_history:
         ids += [x["id"] for x in json.loads(store.objects[url.lstrip("/")]["Body"])["items"]]
@@ -94,3 +108,23 @@ def test_gc_preserves_active_and_recent_objects(database, tmp_path):  # noqa: F8
     assert "dashboard/objects/obsolete.json" not in store.objects
     assert all(key in store.objects for (key,) in publisher.db.execute("SELECT key FROM objects"))
     assert "dashboard/manifest.json" in store.objects
+
+
+def test_r2_backfill_order_and_complete_bucket_pages(backfilled_snapshot, tmp_path):  # noqa: F811
+    from test_publisher import assert_bucket_pages, assert_chronological
+
+    store = Store()
+    publisher = R2Publisher(settings(tmp_path), store)
+    manifest = publisher.publish(backfilled_snapshot)
+
+    def read(url):
+        return json.loads(store.objects[url.lstrip("/")]["Body"])
+
+    dashboard = read(manifest["dashboards"]["1"])
+    items = dashboard["occurrences"]["items"] + [
+        item for url in dashboard["historyPages"] for item in read(url)["items"]
+    ]
+    assert len(items) == 72
+    assert_chronological(items)
+    for url in manifest["dashboards"].values():
+        assert_bucket_pages(read(url), read)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from bisect import bisect_right
 from collections import Counter
 from collections.abc import Mapping
@@ -12,7 +13,7 @@ from sqlalchemy import func, select
 
 from .config import Settings
 from .db import SessionLocal
-from .models import Occurrence, PipelineState, SourceSession
+from .models import Occurrence, PipelineState, SourceSession, TranscriptSegment
 from .schemas import (
     DashboardResponse,
     FormCount,
@@ -25,8 +26,12 @@ from .schemas import (
     StatusResponse,
 )
 
-RANGES = (1, 7, 30)
+RANGES = (0, 1, 7, 30)  # 0 denotes the last hour, with minute buckets.
 PAGE_SIZE = 30
+
+
+def range_duration(days: int) -> timedelta:
+    return timedelta(hours=1) if days == 0 else timedelta(days=days)
 
 
 def aware(value: datetime) -> datetime:
@@ -40,16 +45,26 @@ class Snapshot:
     stats: Mapping[int, bytes]
     status: bytes
     occurrences: Mapping[int, tuple[OccurrenceDto, ...]]
-    negative_ids: Mapping[int, tuple[int, ...]]
+    positions: Mapping[int, Mapping[int, int]]
 
     def page(self, days: int, cursor: int | None = None) -> OccurrencePage:
         rows = self.occurrences[days]
-        start = bisect_right(self.negative_ids[days], -cursor) if cursor is not None else 0
+        start = self.positions[days][cursor] + 1 if cursor is not None else 0
         items = rows[start : start + PAGE_SIZE]
         return OccurrencePage(
             items=list(items),
             next_cursor=items[-1].id if items and start + PAGE_SIZE < len(rows) else None,
         )
+
+    def bucket_items(self, days: int) -> dict[str, list[OccurrenceDto]]:
+        buckets = json.loads(self.stats[days])["buckets"]
+        starts = [datetime.fromisoformat(row["start"]).timestamp() for row in buckets]
+        groups = {row["start"]: [] for row in buckets}
+        for item in self.occurrences[days]:
+            index = bisect_right(starts, item.occurred_at.timestamp()) - 1
+            if index >= 0:
+                groups[buckets[index]["start"]].append(item)
+        return groups
 
 
 def build_snapshot(
@@ -61,7 +76,11 @@ def build_snapshot(
     zone = ZoneInfo(settings.app_timezone)
     # Read history age separately; chart rows cover only the last 30 days.
     with factory() as db:
-        history_started_at = db.scalar(select(func.min(Occurrence.occurred_at)))
+        history_dates = [
+            db.scalar(select(func.min(Occurrence.occurred_at))),
+            db.scalar(select(func.min(TranscriptSegment.started_at))),
+        ]
+        history_started_at = min((value for value in history_dates if value), default=None)
         rows = db.execute(
             select(
                 Occurrence.id,
@@ -77,7 +96,7 @@ def build_snapshot(
                 Occurrence.occurred_at >= now - timedelta(days=30),
                 Occurrence.occurred_at <= now,
             )
-            .order_by(Occurrence.id.desc())
+            .order_by(Occurrence.occurred_at.desc(), Occurrence.id.desc())
         ).all()
         items = tuple(
             OccurrenceDto(
@@ -118,7 +137,7 @@ def build_snapshot(
     dashboards: dict[int, bytes] = {}
     stats: dict[int, bytes] = {}
     occurrences = {
-        days: tuple(item for item in items if item.occurred_at >= now - timedelta(days=days))
+        days: tuple(item for item in items if item.occurred_at >= now - range_duration(days))
         for days in RANGES
     }
     snapshot = Snapshot(
@@ -127,26 +146,47 @@ def build_snapshot(
         stats=MappingProxyType(stats),
         status=status.model_dump_json(by_alias=True).encode(),
         occurrences=MappingProxyType(occurrences),
-        negative_ids=MappingProxyType(
-            {days: tuple(-item.id for item in selected) for days, selected in occurrences.items()}
+        positions=MappingProxyType(
+            {
+                days: {item.id: index for index, item in enumerate(selected)}
+                for days, selected in occurrences.items()
+            }
         ),
     )
     for days, selected in occurrences.items():
         # UTC keys distinguish repeated hours at the autumn DST transition.
         buckets: Counter[datetime] = Counter()
+        if days == 0:
+            minute = (now - timedelta(hours=1)).replace(second=0, microsecond=0)
+            while minute <= now:
+                buckets[minute] = 0
+                minute += timedelta(minutes=1)
         forms = Counter(item.form for item in selected)
         for item in selected:
             local = item.occurred_at.astimezone(zone)
-            floor = local.replace(minute=0, second=0, microsecond=0)
-            if days != 1:
+            floor = local.replace(second=0, microsecond=0)
+            if days != 0:
+                floor = floor.replace(minute=0)
+            if days > 1:
                 floor = floor.replace(hour=0, fold=0)
             buckets[floor.astimezone(UTC)] += 1
         response = StatsResponse(
             history_started_at=aware(history_started_at) if history_started_at else None,
             summary=summary,
-            range=StatRange(from_=now - timedelta(days=days), to=now, total=len(selected)),
+            range=StatRange(from_=now - range_duration(days), to=now, total=len(selected)),
             buckets=[
-                StatBucket(start=start, count=count) for start, count in sorted(buckets.items())
+                StatBucket(
+                    start=start,
+                    count=count,
+                    end=(
+                        start + timedelta(minutes=1)
+                        if days == 0
+                        else start + timedelta(hours=1)
+                        if days == 1
+                        else (start.astimezone(zone) + timedelta(days=1)).astimezone(UTC)
+                    ),
+                )
+                for start, count in sorted(buckets.items())
             ],
             forms=[FormCount(form=form, count=count) for form, count in forms.most_common()],
         )

@@ -10,7 +10,7 @@ import {
   RefreshCw,
   SearchX,
 } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useYouTubeTimelineOrigin } from "@/hooks/use-youtube-timeline"
 import {
   fetchDashboard,
+  fetchBucketOccurrences,
+  sortOccurrences,
+  rangeAvailable,
   fetchManifest,
   dashboardIsStale,
   type Occurrence,
@@ -27,6 +30,7 @@ import {
 } from "@/lib/api"
 
 const RANGE_OPTIONS = [
+  { label: "1 godz.", days: 0 },
   { label: "24 godz.", days: 1 },
   { label: "7 dni", days: 7 },
   { label: "30 dni", days: 30 },
@@ -66,7 +70,8 @@ function formatBucket(value: string, days: number) {
     timeZone: "Europe/Warsaw",
     day: days > 1 ? "2-digit" : undefined,
     month: days > 1 ? "2-digit" : undefined,
-    hour: days <= 7 ? "2-digit" : undefined,
+    hour: days <= 1 ? "2-digit" : undefined,
+    minute: days === 0 ? "2-digit" : undefined,
   }).format(new Date(value))
 }
 
@@ -162,7 +167,19 @@ function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrig
 }
 
 function App() {
-  const [days, setDays] = useState(7)
+  const [days, setDays] = useState(1)
+  const [selectedBucket, setSelectedBucket] = useState<{
+    start: string; end: string; label: string; dashboard: Dashboard
+  } | null>(null)
+  const bucketQuery = useQuery({
+    queryKey: ["bucket", selectedBucket?.start, selectedBucket?.end, selectedBucket?.dashboard.generatedAt],
+    queryFn: ({ signal }) => fetchBucketOccurrences(
+      selectedBucket!.dashboard, selectedBucket!.start, selectedBucket!.end, signal,
+    ),
+    enabled: selectedBucket !== null,
+    staleTime: Infinity,
+    gcTime: 60_000,
+  })
   const [now, setNow] = useState(() => performance.now())
   useEffect(() => {
     const timer = window.setInterval(() => setNow(performance.now()), 15_000)
@@ -198,7 +215,7 @@ function App() {
   const pages = occurrencesQuery.data?.pages ?? lastGoodPages.current
   const dashboard = pages[0]
   const statsQuery = {
-    ...occurrencesQuery, data: dashboard?.stats,
+    ...occurrencesQuery, data: selectedBucket?.dashboard.stats ?? dashboard?.stats,
     isLoading: !dashboard && (manifestQuery.isPending || occurrencesQuery.isPending),
   }
   const refreshFailed = manifestQuery.isError || occurrencesQuery.isError
@@ -206,14 +223,13 @@ function App() {
     dashboardIsStale(dashboard, manifest, now)
   const dataIsStale = refreshFailed || snapshotExpired
   const status = dataIsStale ? undefined : dashboard?.status
-  const occurrences = [...new Map(
-    pages.flatMap((page) => page.occurrences.items)
-      .map((item) => [item.id, item]),
-  ).values()]
+  const occurrences = selectedBucket ? (bucketQuery.data ?? [])
+    : sortOccurrences(pages.flatMap((page) => page.occurrences.items))
+  const listLoading = selectedBucket ? bucketQuery.isPending : statsQuery.isLoading
   const timelineRef = useRef<HTMLDivElement>(null)
   const previousTimeline = useRef<{ days: number; ids: Set<number>; newest: number } | null>(null)
   useEffect(() => {
-    if (!occurrencesQuery.data || occurrencesQuery.isPlaceholderData) return
+    if (selectedBucket || !occurrencesQuery.data || occurrencesQuery.isPlaceholderData) return
 
     const items = occurrencesQuery.data.pages.flatMap((page) => page.occurrences.items)
     const previous = previousTimeline.current
@@ -236,19 +252,39 @@ function App() {
       ], { duration: 900, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }))
     })
     return () => animations.forEach((animation) => animation.cancel())
-  }, [days, occurrencesQuery.data, occurrencesQuery.isPlaceholderData])
+  }, [days, occurrencesQuery.data, occurrencesQuery.isPlaceholderData, selectedBucket])
   const chartData =
     statsQuery.data?.buckets.map((item) => ({
+      start: item.start,
+      end: item.end,
       label: formatBucket(item.start, days),
       count: item.count,
     })) ?? []
 
-  const hasMonthOfHistory = Boolean(dashboard?.stats.historyStartedAt &&
-    Date.parse(dashboard.generatedAt) - Date.parse(dashboard.stats.historyStartedAt) >= 30 * 86_400_000)
-  const availableRanges = RANGE_OPTIONS.filter((option) => option.days !== 30 || hasMonthOfHistory)
+  const availableRanges = RANGE_OPTIONS.filter((option) =>
+    (option.days !== 0 || Boolean(manifest?.dashboards["0"])) &&
+    rangeAvailable(option.days, dashboard?.stats, dashboard?.generatedAt))
   useEffect(() => {
-    if (days === 30 && dashboard && !hasMonthOfHistory) setDays(7)
-  }, [days, dashboard, hasMonthOfHistory])
+    if (dashboard && !rangeAvailable(days, dashboard.stats, dashboard.generatedAt)) setDays(1)
+  }, [days, dashboard])
+
+  const showWeeklySummary = rangeAvailable(7, dashboard?.stats, dashboard?.generatedAt)
+
+  function selectBucket(bucket: { start: string; end: string }) {
+    if (!dashboard || !bucket.end || occurrencesQuery.isPlaceholderData) return
+    const label = days > 1 ? formatDate(bucket.start)
+      : `${formatDate(bucket.start)}, ${formatTime(bucket.start)}–${formatTime(bucket.end)}`
+    setSelectedBucket({ ...bucket, label, dashboard })
+    document.getElementById("timeline")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    })
+  }
+
+  function returnToLive() {
+    setSelectedBucket(null)
+    setDays(1)
+  }
 
 
   return (
@@ -301,7 +337,7 @@ function App() {
               : "Wyświetlamy ostatnie dostępne wyniki. Mogą być nieaktualne."}
           </p>
         )}
-        <section className="stat-grid grid overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 sm:grid-cols-2 xl:grid-cols-4">
+        <section className={`stat-grid grid overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 sm:grid-cols-2 ${showWeeklySummary ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
           <div className="bg-primary px-5 py-6 text-white md:px-7" aria-label="Tusków na godzinę">
             <p className="text-xs font-medium">Tusków na godzinę</p>
             <div className="my-2 flex items-baseline gap-2">
@@ -314,7 +350,7 @@ function App() {
           </div>
           <StatCard label="Dzisiaj" value={statsQuery.data?.summary.today} detail="wystąpień nazwiska Tusk" icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={statsQuery.data?.summary.last24Hours} detail="wystąpień nazwiska Tusk" icon={Activity} />
-          <StatCard label="Ostatnie 7 dni" value={statsQuery.data?.summary.last7Days} detail="wystąpień nazwiska Tusk" icon={BarChart3} />
+          {showWeeklySummary && <StatCard label="Ostatnie 7 dni" value={statsQuery.data?.summary.last7Days} detail="wystąpień nazwiska Tusk" icon={BarChart3} />}
 
         </section>
 
@@ -334,7 +370,7 @@ function App() {
                       className={days === option.days ? "bg-white text-foreground shadow-sm hover:bg-white" : "text-muted-foreground"}
                       size="sm"
                       aria-pressed={days === option.days}
-                      onClick={() => setDays(option.days)}
+                      onClick={() => { setDays(option.days); setSelectedBucket(null) }}
                     >
                       {option.label}
                     </Button>
@@ -350,19 +386,40 @@ function App() {
               {statsQuery.isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : chartData.length ? (
-                <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                <ChartContainer config={chartConfig} className="h-[280px] w-full overflow-hidden">
                   <BarChart data={chartData} margin={{ left: -24, right: 8, top: 12 }}>
                     <CartesianGrid vertical={false} stroke="#e8ebee" strokeDasharray="3 3" />
                     <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={12} minTickGap={24} />
                     <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
                     <ChartTooltip cursor={{ fill: "rgba(0,0,0,.04)" }} content={<ChartTooltipContent />} />
-                    <Bar dataKey="count" fill="var(--color-count)" radius={[3, 3, 0, 0]} maxBarSize={34} />
+                    <Bar dataKey="count" fill="var(--color-count)" radius={[3, 3, 0, 0]} maxBarSize={34}
+                      cursor="pointer" onClick={(entry) => selectBucket(entry.payload)}>
+                      {chartData.map((item) => <Cell key={item.start}
+                        fillOpacity={!selectedBucket || selectedBucket.start === item.start ? 1 : 0.35} />)}
+                    </Bar>
                   </BarChart>
                 </ChartContainer>
               ) : (
                 <div className="flex h-[280px] flex-col items-center justify-center text-center text-muted-foreground">
                   <SearchX className="mb-3 size-7" />
                   <p className="text-sm">Brak wystąpień w tym okresie</p>
+                </div>
+              )}
+              {chartData.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <span>Kliknij słupek, aby zobaczyć wzmianki.</span>
+                  <select aria-label="Wybierz przedział wystąpień"
+                    className="max-w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-foreground"
+                    value={selectedBucket?.start ?? ""}
+                    onChange={(event) => {
+                      const bucket = chartData.find((item) => item.start === event.target.value)
+                      if (bucket) selectBucket(bucket)
+                    }}>
+                    <option value="">Wybierz przedział</option>
+                    {chartData.map((item) => <option key={item.start} value={item.start}>
+                      {formatDate(item.start)}, {item.label} — {item.count} wystąpień
+                    </option>)}
+                  </select>
                 </div>
               )}
             </CardContent>
@@ -403,23 +460,32 @@ function App() {
             <CardHeader className="border-b border-slate-200 md:flex-row md:items-center md:justify-between">
               <div>
                 <CardTitle>Z anteny</CardTitle>
-                <CardDescription className="mt-1">Najnowsze wzmianki o Tusku</CardDescription>
+                <CardDescription className="mt-1">
+                  {selectedBucket ? selectedBucket.label : "Najnowsze wzmianki według czasu wystąpienia"}
+                </CardDescription>
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground md:mt-0">
-                Ostatnia aktualizacja {status?.updatedAt ? formatTime(status.updatedAt) : "—"}
+                {selectedBucket ? (
+                  <Button size="sm" onClick={returnToLive}><Radio className="size-4" />Wróć do live</Button>
+                ) : <>Ostatnia aktualizacja {status?.updatedAt ? formatTime(status.updatedAt) : "—"}</>}
               </div>
             </CardHeader>
             <CardContent>
-              {statsQuery.isLoading ? (
+              {listLoading ? (
                 <div className="space-y-4 py-5">
                   {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 w-full" />)}
+                </div>
+              ) : selectedBucket && bucketQuery.isError ? (
+                <div role="alert" className="py-8 text-center">
+                  <p>Nie udało się pobrać wzmianek z wybranego przedziału.</p>
+                  <Button variant="outline" className="mt-3" onClick={() => bucketQuery.refetch()}>Spróbuj ponownie</Button>
                 </div>
               ) : occurrences.length ? (
                 <>
                   <div ref={timelineRef}>
                     {occurrences.map((item) => <TimelineItem key={item.id} item={item} timelineOrigin={timelineOrigin} />)}
                   </div>
-                  {occurrencesQuery.hasNextPage && (
+                  {!selectedBucket && occurrencesQuery.hasNextPage && (
                     <div className="flex justify-center pt-5">
                       <Button
                         variant="outline"
@@ -438,7 +504,7 @@ function App() {
                     <SearchX className="size-5" />
                   </div>
                   <p className="font-medium">Brak wzmianek w tym okresie</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Nowe wyniki pojawią się tutaj automatycznie.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{selectedBucket ? "Wybierz inny słupek lub wróć do listy live." : "Nowe wyniki pojawią się tutaj automatycznie."}</p>
                 </div>
               )}
             </CardContent>

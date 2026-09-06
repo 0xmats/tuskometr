@@ -41,6 +41,7 @@ class StatRange(ApiModel):
 
 class StatBucket(ApiModel):
     start: datetime
+    end: datetime
     count: int
 
 
@@ -50,7 +51,9 @@ class FormCount(ApiModel):
 
 
 class StatsResponse(ApiModel):
-    history_started_at: datetime | None = Field(default=None, serialization_alias="historyStartedAt")
+    history_started_at: datetime | None = Field(
+        default=None, serialization_alias="historyStartedAt"
+    )
     summary: StatSummary
     range: StatRange
     buckets: list[StatBucket]

@@ -75,7 +75,7 @@ class R2Publisher:
 
         dashboards = {}
         for days, items in snapshot.occurrences.items():
-            # Fixed ID buckets prevent all pages shifting when a new row arrives.
+            # Preserve time order, grouping contiguous IDs to reuse unchanged objects.
             groups = [list(group) for _, group in groupby(items, lambda item: item.id // PAGE_SIZE)]
             history = [
                 immutable({
@@ -90,6 +90,12 @@ class R2Publisher:
                 "nextPage": None,
             }
             payload["historyPages"] = history
+            payload["bucketPages"] = {
+                start: [immutable({"items": [item.model_dump(mode="json", by_alias=True)
+                                            for item in group]})
+                        for _, group in groupby(selected, lambda item: item.id // PAGE_SIZE)]
+                for start, selected in snapshot.bucket_items(days).items()
+            }
             dashboards[str(days)] = immutable(payload)
         manifest = {
             "version": hashlib.sha256(encode(dashboards)).hexdigest(),
