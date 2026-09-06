@@ -7,7 +7,7 @@ import signal
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
@@ -174,6 +174,7 @@ class TuskometrWorker:
         start_sample: int,
         session_started_at: datetime,
         dvr_checkpoint: tuple[int, int, int] | None = None,
+        historical: bool = False,
     ) -> None:
         assert self.transcriber is not None
         chunk_started_at = session_started_at + timedelta(
@@ -213,6 +214,18 @@ class TuskometrWorker:
         # Results and the next DVR position must commit together. A crash or
         # verification/DB failure leaves the same window available for replay.
         with SessionLocal.begin() as db:
+            if db.bind.dialect.name == "sqlite":
+                db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            if historical:
+                from .history import coverage, uncovered_ranges
+
+                gaps = uncovered_ranges(
+                    chunk_started_at, chunk_finished_at,
+                    coverage(db, self.settings.source_url, chunk_started_at, chunk_finished_at),
+                )
+                detections = [item for item in detections if any(
+                    left <= item.occurred_at < right for left, right in gaps
+                )]
             segment_id = self._store_segment(
                 db=db,
                 source_session_id=source_session_id,
@@ -221,7 +234,12 @@ class TuskometrWorker:
                 chunk_started_at=chunk_started_at,
                 result=result,
             )
-            self._store_occurrences(db, source_session_id, segment_id, detections)
+            if historical:
+                self._store_occurrences(
+                    db, source_session_id, segment_id, detections, cross_session=True,
+                )
+            else:
+                self._store_occurrences(db, source_session_id, segment_id, detections)
             if dvr_checkpoint is not None:
                 progress_id, next_sequence, next_sample = dvr_checkpoint
                 progress = db.get(DvrProgress, progress_id)
@@ -229,6 +247,13 @@ class TuskometrWorker:
                     raise RuntimeError("Brak checkpointu DVR")
                 progress.next_sequence = next_sequence
                 progress.next_sample = next_sample
+        if historical:
+            logger.info(
+                "Historia DVR: zapisano segment %.1fs od %s, trafienia=%d, przetwarzanie=%.2fs",
+                duration_seconds, chunk_started_at.isoformat(), len(detections),
+                (datetime.now(UTC) - started).total_seconds(),
+            )
+            return
         self._update_state(
             "live",
             last_transcript_at=datetime.now(UTC),
@@ -356,17 +381,31 @@ class TuskometrWorker:
         source_session_id: int,
         segment_id: int,
         detections: list[DetectedOccurrence],
+        cross_session: bool = False,
     ) -> None:
         tolerance_samples = round(self.settings.sample_rate * 0.75)
         for detection in detections:
+            position_match = and_(
+                Occurrence.source_session_id == source_session_id,
+                Occurrence.source_sample.between(
+                    detection.source_sample - tolerance_samples,
+                    detection.source_sample + tolerance_samples,
+                ),
+            )
+            if cross_session:
+                position_match = or_(position_match, and_(
+                    Occurrence.source_session_id.in_(select(SourceSession.id).where(
+                        SourceSession.source_url == self.settings.source_url,
+                    )),
+                    Occurrence.occurred_at.between(
+                        detection.occurred_at - timedelta(seconds=0.75),
+                        detection.occurred_at + timedelta(seconds=0.75),
+                    ),
+                ))
             duplicate = db.scalar(
                 select(Occurrence.id).where(
-                    Occurrence.source_session_id == source_session_id,
                     Occurrence.normalized_form == detection.normalized_form,
-                    Occurrence.source_sample.between(
-                        detection.source_sample - tolerance_samples,
-                        detection.source_sample + tolerance_samples,
-                    ),
+                    position_match,
                 )
             )
             if duplicate:

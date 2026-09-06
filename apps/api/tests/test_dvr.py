@@ -70,7 +70,7 @@ def environment(monkeypatch):
     monkeypatch.setattr("app.dvr_runner.YoutubeDvrSource", FakeSource)
     monkeypatch.setattr(FakeSource, "head_sequence", 100)
     monkeypatch.setattr(FakeSource, "requested", [])
-    settings = Settings(_env_file=None, sample_rate=RATE)
+    settings = Settings(_env_file=None, sample_rate=RATE, youtube_history_enabled=False)
     yield settings, factory
     engine.dispose()
 

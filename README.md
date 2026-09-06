@@ -27,13 +27,32 @@ unchanged checkpoint. Existing short segments can coexist with longer segments;
 no database migration is required. Five minutes of 16 kHz PCM uses about 9.6 MB
 per audio buffer (temporary copies and ASR memory are additional).
 
-The first activation starts with the next live fragment: earlier gaps cannot be
-reconstructed from the legacy worker's session-relative offsets. Subsequent
-interruptions recover automatically. If the saved position has left the DVR
-window, the worker records an interval in `ingestion_gaps`, logs a warning and
-continues from the oldest allowed fragment (with two fragments of margin).
-A changed encoder generation starts a new source session and resumes by time
-where available. HTTP/decoding errors inside the window are retried, not skipped.
+Historical gap filling is enabled by default (`YOUTUBE_HISTORY_ENABLED=true`).
+After processing current audio, the worker scans the available DVR window for
+missing transcript intervals, including time before its first successful start.
+It processes one historical window (up to 300 seconds) before returning to current
+audio. Live catch-up takes priority when behind by more than one live window.
+Coverage uses transcript ranges, including silence and segments with no mentions,
+across all sessions of the configured source URL. Committed ranges are the durable
+history progress: restarting the worker resumes the remaining gaps automatically.
+No new schema or reset of the live checkpoint is needed.
+
+Historical detections are accepted only in still-uncovered intervals, with
+additional same-source deduplication across sessions. Historical results publish
+with their original source timestamps; they do not overwrite live status or send
+collecting heartbeats. Logs prefixed `Historia DVR:` report the selected gap,
+committed window, completion, or a retryable failure. Set
+`YOUTUBE_HISTORY_ENABLED=false` to disable historical scanning independently of
+normal DVR resume. Old session timestamps may be approximate; the current encoder
+and its available DVR window bound what can be recovered. There is no archive
+beyond that window, and the scanner does not claim unavailable audio is recovered.
+
+The live checkpoint still starts with the next source fragment on first activation.
+If a saved live position has left the DVR window, the worker records an interval
+in `ingestion_gaps`, logs a warning and continues from the oldest allowed fragment
+(with two fragments of margin). A changed encoder generation starts a new source
+session and resumes by time where available. HTTP/decoding errors inside the
+window are retried, not skipped.
 
 The `DVR: wznawianie…` log reports the saved and current source sequences;
 `lag` reports how far processing is behind the source clock. Media positions are

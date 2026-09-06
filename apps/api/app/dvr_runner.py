@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 
 from .dvr import AudioFragment, Head, YoutubeDvrSource, time_origin, utc
+from .history import HistoricalBackfill
 from .models import DvrProgress, IngestionGap, SourceSession
 from .source import SourceError
 
@@ -129,6 +130,7 @@ class DvrRunner:
                 head.sequence,
             )
             fragments: list[AudioFragment] = []
+            history = HistoricalBackfill(self.worker, self.factory)
             while not self.worker.stop_event.is_set():
                 head = await source.head()
                 earliest = source.earliest_sequence(head)
@@ -168,6 +170,7 @@ class DvrRunner:
                 if sum(len(item.pcm) for item in fragments) // 2 - offset < window_samples:
                     continue
                 pcm = b"".join(item.pcm for item in fragments)
+                processed = False
                 while not self.worker.stop_event.is_set():
                     window_samples, step_samples = self.window_sizes(head, progress.next_sample)
                     if len(pcm) // 2 - offset < window_samples:
@@ -189,8 +192,11 @@ class DvrRunner:
                     )
                     progress.next_sample = next_sample
                     progress.next_sequence = next_sequence
+                    processed = True
                     offset = progress.next_sample - start
                 fragments = [item for item in fragments if item.sequence >= progress.next_sequence]
+                if processed and not self.worker.stop_event.is_set():
+                    await history.run_one(source, progress, await source.head())
         except Exception as error:
             if progress:
                 self.worker._mark_session(progress.source_session_id, "error", str(error)[-1000:])
