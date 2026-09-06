@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from .config import get_settings
+from .monitoring import Heartbeat
 
 logger = logging.getLogger("tuskometr.backup")
 running = True
@@ -122,6 +123,9 @@ def backup_once(source: Path, backup_dir: Path, keep: int) -> Path:
             from .backup_repository import Repository
 
             Repository().backup(snapshot)
+            Heartbeat(
+                get_settings().healthchecks_backup_url.get_secret_value(), "backup"
+            ).ping()
         logger.info("Backup completed: %s", snapshot.name)
         return snapshot
 

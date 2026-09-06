@@ -129,7 +129,7 @@ function sourceMomentUrl(item: Occurrence, timelineOrigin: number | null) {
 function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrigin: number | null }) {
   const momentUrl = sourceMomentUrl(item, timelineOrigin)
   return (
-    <article className="group relative grid gap-3 border-b border-slate-200 py-6 last:border-0 md:grid-cols-[108px_1fr_auto] md:gap-6">
+    <article data-occurrence-id={item.id} className="group relative grid gap-3 border-b border-slate-200 py-6 last:border-0 md:grid-cols-[108px_1fr_auto] md:gap-6">
       <div>
         <p className="text-sm font-semibold tracking-tight tabular-nums">{formatTime(item.occurredAt)}</p>
         <p className="mt-1 text-xs capitalize text-muted-foreground">{formatDate(item.occurredAt)}</p>
@@ -210,6 +210,33 @@ function App() {
     pages.flatMap((page) => page.occurrences.items)
       .map((item) => [item.id, item]),
   ).values()]
+  const timelineRef = useRef<HTMLDivElement>(null)
+  const previousTimeline = useRef<{ days: number; ids: Set<number>; newest: number } | null>(null)
+  useEffect(() => {
+    if (!occurrencesQuery.data || occurrencesQuery.isPlaceholderData) return
+
+    const items = occurrencesQuery.data.pages.flatMap((page) => page.occurrences.items)
+    const previous = previousTimeline.current
+    const ids = new Set(items.map((item) => item.id))
+    const newest = items.reduce((latest, item) => Math.max(latest, Date.parse(item.occurredAt)), -Infinity)
+    previousTimeline.current = { days, ids, newest }
+
+    // Initial loading, range changes and older pages should stay still.
+    if (!previous || previous.days !== days || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    const incoming = new Set(items
+      .filter((item) => !previous.ids.has(item.id) && Date.parse(item.occurredAt) >= previous.newest)
+      .map((item) => String(item.id)))
+    const animations: Animation[] = []
+    timelineRef.current?.querySelectorAll<HTMLElement>("[data-occurrence-id]").forEach((element) => {
+      if (!incoming.has(element.dataset.occurrenceId!)) return
+      animations.push(element.animate([
+        { opacity: 0, transform: "translateY(-8px)", backgroundColor: "color-mix(in srgb, var(--primary) 9%, transparent)" },
+        { opacity: 1, transform: "translateY(0)", backgroundColor: "color-mix(in srgb, var(--primary) 6%, transparent)", offset: 0.35 },
+        { opacity: 1, transform: "translateY(0)", backgroundColor: "transparent" },
+      ], { duration: 900, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }))
+    })
+    return () => animations.forEach((animation) => animation.cancel())
+  }, [days, occurrencesQuery.data, occurrencesQuery.isPlaceholderData])
   const chartData =
     statsQuery.data?.buckets.map((item) => ({
       label: formatBucket(item.start, days),
@@ -389,7 +416,9 @@ function App() {
                 </div>
               ) : occurrences.length ? (
                 <>
-                  {occurrences.map((item) => <TimelineItem key={item.id} item={item} timelineOrigin={timelineOrigin} />)}
+                  <div ref={timelineRef}>
+                    {occurrences.map((item) => <TimelineItem key={item.id} item={item} timelineOrigin={timelineOrigin} />)}
+                  </div>
                   {occurrencesQuery.hasNextPage && (
                     <div className="flex justify-center pt-5">
                       <Button

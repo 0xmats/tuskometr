@@ -52,6 +52,7 @@ services:
       DASHBOARD_STORAGE: local
       DATABASE_URL: sqlite:////data/tuskometr.db
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Warsaw}
+      HEALTHCHECKS_PUBLISHING_URL: ${HEALTHCHECKS_PUBLISHING_URL:-}
       DASHBOARD_REFRESH_SECONDS: ${DASHBOARD_REFRESH_SECONDS:-30}
       DASHBOARD_MAX_STALE_SECONDS: ${DASHBOARD_MAX_STALE_SECONDS:-120}
       DASHBOARD_RETENTION_SECONDS: ${DASHBOARD_RETENTION_SECONDS:-900}
@@ -71,6 +72,7 @@ services:
     command: ["python", "-m", "app.worker"]
     environment:
       DATABASE_URL: sqlite:////data/tuskometr.db
+      HEALTHCHECKS_COLLECTING_URL: ${HEALTHCHECKS_COLLECTING_URL:-}
       SOURCE_MODE: ${SOURCE_MODE:-youtube}
       SOURCE_URL: ${SOURCE_URL:-https://www.youtube.com/watch?v=dzntyCTgJMQ}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Warsaw}
@@ -79,7 +81,7 @@ services:
       ASR_PROVIDER: ${ASR_PROVIDER:-local}
       ASR_API_KEY: ${ASR_API_KEY:-}
       ASR_API_BASE_URL: ${ASR_API_BASE_URL:-https://oai.endpoints.kepler.ai.cloud.ovh.net/v1}
-      ASR_API_MODEL: ${ASR_API_MODEL:-whisper-large-v3}
+      ASR_API_MODEL: ${ASR_API_MODEL:-whisper-large-v3-turbo}
       ASR_API_TIMEOUT_SECONDS: ${ASR_API_TIMEOUT_SECONDS:-60}
       ASR_FALLBACK_MODEL: ${ASR_FALLBACK_MODEL:-base}
       ASR_DEVICE: ${ASR_DEVICE:-cpu}
@@ -111,6 +113,7 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/tuskometr.db
       BACKUP_DIR: /backups
+      HEALTHCHECKS_BACKUP_URL: ${HEALTHCHECKS_BACKUP_URL:-}
       BACKUP_KEEP: ${BACKUP_KEEP:-7}
     volumes:
       - app-data:/data

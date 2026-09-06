@@ -20,10 +20,10 @@
   --foreground: #192128;
   --card: #ffffff;
   --card-foreground: #192128;
-  --primary: #bc2635;
+  --primary: #b04338;
   --primary-foreground: #ffffff;
   --muted-foreground: #616a73;
-  --ring: #bc2635;
+  --ring: var(--primary);
   font-family: "Geist Variable", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -51,7 +51,7 @@ a {
 }
 
 ::selection {
-  background: rgba(239, 78, 69, 0.3);
+  background: rgb(176 67 56 / 20%);
 }
 
 ::-webkit-scrollbar {

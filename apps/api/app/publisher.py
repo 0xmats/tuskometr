@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 
 from .config import get_settings
+from .monitoring import Heartbeat
 from .snapshot import PAGE_SIZE, Snapshot, build_snapshot
 
 logger = logging.getLogger("tuskometr.publisher")
@@ -97,6 +98,7 @@ def cleanup(root: Path, current_version: str, retention_seconds: float) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     settings = get_settings()
+    heartbeat = Heartbeat(settings.healthchecks_publishing_url.get_secret_value(), "publishing")
     root = settings.dashboard_output_dir
     root.mkdir(parents=True, exist_ok=True)
     stop = threading.Event()
@@ -119,6 +121,7 @@ def main() -> None:
                     manifest = publish(snapshot, root, settings.dashboard_max_stale_seconds)
                     cleanup(root, manifest["version"], settings.dashboard_retention_seconds)
                 logger.info("Opublikowano dashboard %s", manifest["version"])
+                heartbeat.ping()
             except Exception:
                 logger.exception("Publikacja nie powiodła się; poprzednie pliki pozostają dostępne")
             stop.wait(settings.dashboard_refresh_seconds)

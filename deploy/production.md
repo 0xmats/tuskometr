@@ -101,3 +101,18 @@ docker compose -f docker-compose.prod.yml logs --tail=100
 For an application rollback, deploy a reviewed revert commit. Restore SQLite
 separately if a schema migration requires it; changing the image alone does not
 undo database changes.
+
+## Alerts (optional)
+
+Set `HEALTHCHECKS_COLLECTING_URL`, `HEALTHCHECKS_PUBLISHING_URL` and
+`HEALTHCHECKS_BACKUP_URL` to their private Healthchecks ping URLs in
+`/opt/tuskometr/.env`, then deploy through Actions. Leave empty to disable.
+Use Simple checks: collecting/publishing period 1 minute, grace 4 minutes;
+backup period 1 day, grace 2 hours. Enable your email integration for all three.
+
+Signals follow successful audio processing and database writes, dashboard
+publication, and remote backup respectively. Collecting/publishing send at most
+once per minute. Failed checks recover on the next successful signal. Heartbeat
+requests use a 3-second network timeout; failures do not stop application work.
+These checks monitor processing and publication, not browser access or CORS.
+Keep development ping URLs empty to avoid masking a production outage.

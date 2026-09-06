@@ -347,3 +347,37 @@ def test_frozen_head_triggers_source_refresh(monkeypatch):
             await source.close()
 
     asyncio.run(exercise())
+
+
+def test_collecting_heartbeat_follows_commit_even_without_mentions(environment, monkeypatch):
+    from app.monitoring import Heartbeat
+
+    settings, factory = environment
+    calls = []
+
+    class EmptyTranscriber:
+        model_name = "test"
+
+        def transcribe_pcm(self, pcm):
+            return TranscriptionResult("", [], 0.95)
+
+    worker = TuskometrWorker(settings, EmptyTranscriber())
+    session_id = worker._create_source_session(NOW)
+
+    def ping(self):
+        from app.models import TranscriptSegment
+
+        with factory() as db:
+            calls.append(db.scalar(select(func.count()).select_from(TranscriptSegment)))
+
+    monkeypatch.setattr(Heartbeat, "ping", ping)
+    asyncio.run(worker._process_window(session_id, b"\0\0" * (25 * RATE), 0, NOW))
+    assert calls == [1]
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("write failed")
+
+    monkeypatch.setattr(worker, "_store_segment", fail)
+    with pytest.raises(RuntimeError, match="write failed"):
+        asyncio.run(worker._process_window(session_id, b"\0\0" * (25 * RATE), RATE, NOW))
+    assert calls == [1]

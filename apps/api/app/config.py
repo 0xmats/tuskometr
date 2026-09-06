@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     asr_provider: Literal["local", "ovh"] = "local"
     asr_api_key: SecretStr = SecretStr("")
     asr_api_base_url: str = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1"
-    asr_api_model: str = "whisper-large-v3"
+    asr_api_model: str = "whisper-large-v3-turbo"
     asr_api_timeout_seconds: float = Field(default=60, gt=0, le=300)
     asr_model: str = "small"
     asr_fallback_model: str = "base"
@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     ytdlp_pot_provider_url: str = ""
     youtube_dvr_enabled: bool = True
     youtube_dvr_hours: float = Field(default=12, ge=0.1, le=12)
+
+    healthchecks_collecting_url: SecretStr = SecretStr("")
+    healthchecks_publishing_url: SecretStr = SecretStr("")
+    healthchecks_backup_url: SecretStr = SecretStr("")
 
     frontend_dist: Path = Path("/app/static")
     dashboard_storage: Literal["local", "r2"] = "local"

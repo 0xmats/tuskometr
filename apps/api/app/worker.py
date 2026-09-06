@@ -18,6 +18,7 @@ from .detection import (
     materialize_occurrence,
 )
 from .models import DvrProgress, Occurrence, PipelineState, SourceSession, TranscriptSegment
+from .monitoring import Heartbeat
 from .source import ProcessAudioSource, SourceError, validate_source
 from .transcriber import Transcriber, TranscriptionResult, WhisperTranscriber, create_transcriber
 
@@ -32,6 +33,9 @@ class TuskometrWorker:
         transcriber: Transcriber | None = None,
     ) -> None:
         self.settings = settings
+        self.heartbeat = Heartbeat(
+            settings.healthchecks_collecting_url.get_secret_value(), "collecting"
+        )
         self.transcriber = transcriber
         self.stop_event = asyncio.Event()
         self.reconnect_count = 0
@@ -252,6 +256,7 @@ class TuskometrWorker:
             lag,
         )
         self._cleanup_expired()
+        await asyncio.to_thread(self.heartbeat.ping)
 
     async def _activate_fallback_model(self) -> None:
         logger.warning(
