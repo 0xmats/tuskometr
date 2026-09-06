@@ -84,7 +84,7 @@ def read_url(root, url):
 def test_publication_and_reads_without_database(database, tmp_path):
     factory, reads = database
     snapshot = build_snapshot(Settings(_env_file=None), factory)
-    assert len(reads) == 2
+    assert len(reads) == 3
     manifest = publish(snapshot, tmp_path)
     reads.clear()
     for _ in range(100):
@@ -213,3 +213,36 @@ def test_empty_database_still_produces_valid_files(tmp_path):
         assert page["stats"]["range"]["total"] == 0
         assert page["status"]["state"] == "offline"
     engine.dispose()
+
+
+@pytest.mark.parametrize("age_days", [29, 30, 45])
+def test_history_start_survives_chart_window(database, age_days):
+    from sqlalchemy import select
+
+    factory, _ = database
+    now = datetime.now(UTC)
+    oldest = now - timedelta(days=age_days)
+    with factory() as db:
+        occurrence = db.scalar(select(Occurrence).order_by(Occurrence.id).limit(1))
+        occurrence.occurred_at = oldest
+        db.commit()
+    snapshot = build_snapshot(Settings(_env_file=None), factory, now=now)
+    for days in (1, 7, 30):
+        stats = json.loads(snapshot.stats[days])
+        assert datetime.fromisoformat(stats["historyStartedAt"].replace("Z", "+00:00")) == oldest
+
+
+@pytest.mark.parametrize("seconds_ago, expected", [(3599, 1), (3600, 1), (3601, 0), (-1, 0)])
+def test_hourly_count_boundaries(database, seconds_ago, expected):
+    from sqlalchemy import select
+
+    factory, _ = database
+    now = datetime.now(UTC)
+    with factory() as db:
+        rows = list(db.scalars(select(Occurrence).order_by(Occurrence.id)))
+        rows[0].occurred_at = now - timedelta(seconds=seconds_ago)
+        rows[1].occurred_at = now - timedelta(hours=2)
+        db.commit()
+    snapshot = build_snapshot(Settings(_env_file=None), factory, now=now)
+    for days in (1, 7, 30):
+        assert json.loads(snapshot.stats[days])["summary"]["lastHour"] == expected

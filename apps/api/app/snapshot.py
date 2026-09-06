@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .config import Settings
 from .db import SessionLocal
@@ -59,8 +59,9 @@ def build_snapshot(
 ) -> Snapshot:
     now = now or datetime.now(UTC)
     zone = ZoneInfo(settings.app_timezone)
-    # Two reads per refresh, independent of visitors; only the last 30 days.
+    # Read history age separately; chart rows cover only the last 30 days.
     with factory() as db:
+        history_started_at = db.scalar(select(func.min(Occurrence.occurred_at)))
         rows = db.execute(
             select(
                 Occurrence.id,
@@ -109,6 +110,7 @@ def build_snapshot(
         status.state = "offline"
     today = now.astimezone(zone).replace(hour=0, minute=0, second=0, microsecond=0)
     summary = StatSummary(
+        last_hour=sum(item.occurred_at >= now - timedelta(hours=1) for item in items),
         today=sum(item.occurred_at >= today for item in items),
         last_24_hours=sum(item.occurred_at >= now - timedelta(days=1) for item in items),
         last_7_days=sum(item.occurred_at >= now - timedelta(days=7) for item in items),
@@ -140,6 +142,7 @@ def build_snapshot(
                 floor = floor.replace(hour=0, fold=0)
             buckets[floor.astimezone(UTC)] += 1
         response = StatsResponse(
+            history_started_at=aware(history_started_at) if history_started_at else None,
             summary=summary,
             range=StatRange(from_=now - timedelta(days=days), to=now, total=len(selected)),
             buckets=[

@@ -1,6 +1,6 @@
 [
   {
-    "AllowedOrigins": ["https://tuskometr.example.com", "https://tuskometr.pages.dev"],
+    "AllowedOrigins": ["https://tuskometr.com", "https://www.tuskometr.com", "https://tuskometr.pages.dev"],
     "AllowedMethods": ["GET", "HEAD"],
     "AllowedHeaders": ["Accept"],
     "ExposeHeaders": ["Date", "Age", "ETag"],

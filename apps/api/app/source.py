@@ -42,7 +42,15 @@ class ProcessAudioSource:
             "--format",
             "bestaudio/best",
             "--get-url",
+            "--js-runtimes",
+            "deno",
         ]
+        if self.settings.ytdlp_pot_provider_url:
+            command.extend([
+                "--extractor-args", "youtube:player_client=mweb",
+                "--extractor-args",
+                f"youtubepot-bgutilhttp:base_url={self.settings.ytdlp_pot_provider_url}",
+            ])
         if self.settings.ytdlp_cookies_file:
             command.extend(["--cookies", str(self.settings.ytdlp_cookies_file)])
         command.append(self.settings.source_url)
@@ -104,14 +112,17 @@ class ProcessAudioSource:
         return await self.process.wait()
 
     async def close(self) -> None:
-        if self.process is None or self.process.returncode is not None:
+        if self.process is None:
             return
-        self.process.terminate()
+        if self.process.returncode is None:
+            self.process.terminate()
         try:
-            await asyncio.wait_for(self.process.wait(), timeout=5)
+            # Drain buffered audio so waiting for FFmpeg cannot deadlock on a full pipe.
+            await asyncio.wait_for(self.process.communicate(), timeout=5)
         except TimeoutError:
-            self.process.kill()
-            await self.process.wait()
+            if self.process.returncode is None:
+                self.process.kill()
+            await self.process.communicate()
 
 
 def validate_source(settings: Settings) -> None:

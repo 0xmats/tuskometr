@@ -41,7 +41,7 @@ function ChartTooltipContent({
   const context = React.useContext(ChartContext)
   if (!active || !payload?.length) return null
   return (
-    <div className="min-w-32 rounded-xl border border-white/10 bg-[#11161d]/95 px-3 py-2 text-xs shadow-2xl backdrop-blur">
+    <div className="min-w-32 border border-stone-200 bg-white px-3 py-2 text-xs shadow-md">
       <p className="mb-1 text-muted-foreground">{label}</p>
       {payload.map((item) => (
         <div key={String(item.dataKey)} className="flex items-center justify-between gap-6 font-medium">

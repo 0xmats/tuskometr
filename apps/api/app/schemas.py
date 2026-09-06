@@ -27,6 +27,7 @@ class OccurrencePage(ApiModel):
 
 
 class StatSummary(ApiModel):
+    last_hour: int = Field(default=0, serialization_alias="lastHour")
     today: int
     last_24_hours: int = Field(serialization_alias="last24Hours")
     last_7_days: int = Field(serialization_alias="last7Days")
@@ -49,6 +50,7 @@ class FormCount(ApiModel):
 
 
 class StatsResponse(ApiModel):
+    history_started_at: datetime | None = Field(default=None, serialization_alias="historyStartedAt")
     summary: StatSummary
     range: StatRange
     buckets: list[StatBucket]

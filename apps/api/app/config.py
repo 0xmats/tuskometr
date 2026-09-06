@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     sample_rate: int = Field(default=16_000, ge=8_000, le=48_000)
     max_audio_queue_seconds: int = Field(default=90, ge=30, le=900)
     ytdlp_cookies_file: Path | None = None
+    ytdlp_pot_provider_url: str = ""
 
     frontend_dist: Path = Path("/app/static")
     dashboard_storage: Literal["local", "r2"] = "local"

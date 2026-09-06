@@ -14,7 +14,9 @@ export type OccurrencePage = {
 }
 
 export type Stats = {
+  historyStartedAt?: string | null
   summary: {
+    lastHour?: number
     today: number
     last24Hours: number
     last7Days: number

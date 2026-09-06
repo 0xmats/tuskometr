@@ -9,7 +9,6 @@ import {
   Radio,
   RefreshCw,
   SearchX,
-  Signal,
 } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
@@ -25,9 +24,7 @@ import {
   dashboardIsStale,
   type Occurrence,
   type Dashboard,
-  type PipelineStatus,
 } from "@/lib/api"
-import { cn } from "@/lib/utils"
 
 const RANGE_OPTIONS = [
   { label: "24 godz.", days: 1 },
@@ -36,7 +33,7 @@ const RANGE_OPTIONS = [
 ] as const
 
 const chartConfig = {
-  count: { label: "Wystąpienia", color: "#ef4e45" },
+  count: { label: "Wystąpienia", color: "#b9232e" },
 } satisfies ChartConfig
 
 const formsPattern = /\b(tusk|tuska|tuskowi|tuskiem|tusku|tuskowie|tusków|tuskom|tuskami|tuskach)\b/giu
@@ -73,23 +70,13 @@ function formatBucket(value: string, days: number) {
   }).format(new Date(value))
 }
 
-function statusPresentation(status?: PipelineStatus) {
-  if (status?.state === "live") {
-    return { label: "Transmisja aktywna", variant: "live" as const, dot: "bg-emerald-400" }
-  }
-  if (status?.state === "reconnecting" || status?.state === "starting") {
-    return { label: "Łączenie ze źródłem", variant: "warning" as const, dot: "bg-amber-400" }
-  }
-  return { label: "Transmisja offline", variant: "offline" as const, dot: "bg-red-400" }
-}
-
 function HighlightedQuote({ text }: { text: string }) {
   const parts = text.split(formsPattern)
   return (
-    <p className="text-[15px] leading-7 text-foreground/90">
+    <p className="font-display text-lg leading-8 text-foreground/90 md:text-xl">
       {parts.map((part, index) =>
         normalizedForms.has(part.toLocaleLowerCase("pl-PL")) ? (
-          <mark key={`${part}-${index}`} className="rounded bg-primary/15 px-1 py-0.5 font-semibold text-primary">
+          <mark key={`${part}-${index}`} className="bg-primary/10 px-0.5 font-semibold text-primary">
             {part}
           </mark>
         ) : (
@@ -112,8 +99,7 @@ function StatCard({
   icon: typeof Activity
 }) {
   return (
-    <Card className="relative overflow-hidden">
-      <div className="absolute right-0 top-0 h-24 w-24 translate-x-8 -translate-y-8 rounded-full bg-primary/[0.07] blur-2xl" />
+    <Card className="border-t-0 px-5 first:pl-0">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardDescription>{label}</CardDescription>
@@ -121,7 +107,7 @@ function StatCard({
         </div>
       </CardHeader>
       <CardContent>
-        {value === undefined ? <Skeleton className="mb-2 h-9 w-20" /> : <p className="font-display text-4xl font-semibold tracking-tight">{value}</p>}
+        {value === undefined ? <Skeleton className="mb-2 h-9 w-20" /> : <p className="font-display text-5xl font-bold tracking-tight">{value}</p>}
         <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
       </CardContent>
     </Card>
@@ -141,10 +127,9 @@ function sourceMomentUrl(item: Occurrence, timelineOrigin: number | null) {
 }
 
 function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrigin: number | null }) {
-  const confidence = Math.round(item.confidence * 100)
   const momentUrl = sourceMomentUrl(item, timelineOrigin)
   return (
-    <article className="group relative grid gap-3 border-b border-white/[0.06] py-5 last:border-0 md:grid-cols-[108px_1fr_auto] md:gap-5">
+    <article className="group relative grid gap-3 border-b border-stone-200 py-5 last:border-0 md:grid-cols-[108px_1fr_auto] md:gap-5">
       <div>
         <p className="font-mono text-lg font-semibold tracking-tight">{formatTime(item.occurredAt)}</p>
         <p className="mt-1 text-xs capitalize text-muted-foreground">{formatDate(item.occurredAt)}</p>
@@ -152,7 +137,6 @@ function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrig
       <div className="min-w-0">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{item.form}</Badge>
-          <span className="text-xs text-muted-foreground">pewność {confidence}%</span>
         </div>
         <HighlightedQuote text={item.quote} />
       </div>
@@ -161,17 +145,15 @@ function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrig
           <Button asChild size="sm">
             <a href={momentUrl} target="_blank" rel="noreferrer">
               <ExternalLink className="size-4" />
-              Otwórz moment
+              Zobacz fragment
             </a>
           </Button>
         ) : (
-          <Button
-            size="sm"
-            disabled
-            title={timelineOrigin === null ? "Kalibracja osi czasu YouTube" : "Moment wypadł poza okno DVR YouTube"}
-          >
-            <ExternalLink className="size-4" />
-            {timelineOrigin === null ? "Ustalam moment…" : "Poza oknem DVR"}
+          <Button asChild variant="outline" size="sm">
+            <a href={item.sourceUrl} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-4" />
+              Zobacz kanał
+            </a>
           </Button>
         )}
       </div>
@@ -224,7 +206,6 @@ function App() {
     dashboardIsStale(dashboard, manifest, now)
   const dataIsStale = refreshFailed || snapshotExpired
   const status = dataIsStale ? undefined : dashboard?.status
-  const statusView = statusPresentation(status)
   const occurrences = [...new Map(
     pages.flatMap((page) => page.occurrences.items)
       .map((item) => [item.id, item]),
@@ -235,88 +216,107 @@ function App() {
       count: item.count,
     })) ?? []
 
-  const refresh = () => {
-    void manifestQuery.refetch()
-    if (occurrencesQuery.isError) void occurrencesQuery.refetch()
-  }
+  const hasMonthOfHistory = Boolean(dashboard?.stats.historyStartedAt &&
+    Date.parse(dashboard.generatedAt) - Date.parse(dashboard.stats.historyStartedAt) >= 30 * 86_400_000)
+  const availableRanges = RANGE_OPTIONS.filter((option) => option.days !== 30 || hasMonthOfHistory)
+  useEffect(() => {
+    if (days === 30 && dashboard && !hasMonthOfHistory) setDays(7)
+  }, [days, dashboard, hasMonthOfHistory])
+
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-5 md:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-              <Signal className="size-5" />
-            </div>
-            <div>
-              <h1 className="font-display text-xl font-semibold tracking-[-0.03em]">tuskometr</h1>
-              <p className="text-xs text-muted-foreground">monitoring transmisji na żywo</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={statusView.variant} className="hidden sm:inline-flex">
-              <span className={cn("size-1.5 rounded-full", statusView.dot, status?.state === "live" && "animate-pulse")} />
-              {statusView.label}
-            </Badge>
-            <Button variant="outline" size="icon" onClick={refresh} aria-label="Odśwież dane">
-              <RefreshCw className={cn("size-4", statsQuery.isFetching && "animate-spin")} />
-            </Button>
-          </div>
+      <header className="mx-auto max-w-[1280px] px-5 md:px-8">
+        <div className="flex items-center justify-between gap-4 border-b border-stone-200 py-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+          <span>Niezależny monitoring mediów</span>
+          <a href="#about-project" className="shrink-0 hover:text-primary">O projekcie ↗</a>
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-5 py-7 md:py-9">
+          <div>
+            <h1 className="font-display text-5xl font-bold tracking-[-0.06em] sm:text-7xl">Tuskometr<span className="text-primary">.</span></h1>
+            <p className="mt-2 text-xs text-muted-foreground sm:text-sm">Polityka na antenie. Liczby, cytaty, kontekst.</p>
+          </div>
+          {status?.state === "live" && (
+            <span className="flex items-center gap-3 text-xs font-bold tracking-[0.16em] text-primary" aria-label="Na żywo">
+              <span className="relative flex size-2.5" aria-hidden="true">
+                <span className="absolute inset-0 rounded-full bg-primary/40 motion-safe:animate-ping" />
+                <span className="relative size-2.5 rounded-full bg-primary" />
+              </span>
+              LIVE
+            </span>
+          )}
+        </div>
+        <nav aria-label="Sekcje strony" className="flex flex-wrap gap-x-7 gap-y-3 border-t-2 border-b border-foreground py-3 text-xs font-bold uppercase tracking-widest">
+          <a href="#overview" className="text-primary">Republika pod lupą</a>
+          <a href="#analysis" className="hover:text-primary">W liczbach</a>
+          <a href="#timeline" className="hover:text-primary">Z anteny</a>
+        </nav>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-5 py-8 md:px-8 md:py-10">
-        <section className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+      <main className="mx-auto max-w-[1280px] px-5 py-8 md:px-8 md:py-10">
+        <section id="overview" className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
-            <Badge variant="secondary" className="mb-4"><Radio className="size-3" /> Automatyczna transkrypcja</Badge>
-            <h2 className="font-display text-3xl font-semibold tracking-[-0.04em] md:text-5xl">
+            <p className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-primary"><Radio className="size-3.5" /> Temat obserwacji · Donald Tusk</p>
+            <h2 className="font-display text-4xl font-bold leading-[1.06] tracking-[-0.04em] md:text-6xl">
               Ile razy padło nazwisko <span className="text-primary">Tusk?</span>
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground md:text-base">
-              Wykryte odmiany nazwiska w transmisji Telewizji Republika. Statystyki odświeżamy co 30 sekund; transkrypcja wprowadza dodatkowe opóźnienie.
+              Jak często Telewizja Republika mówi o Tusku? Sprawdź liczby i zobacz, w jakim kontekście pada jego nazwisko.
             </p>
           </div>
-          <div className="flex w-fit rounded-xl border border-white/[0.08] bg-white/[0.03] p-1">
-            {RANGE_OPTIONS.map((option) => (
-              <Button
-                key={option.days}
-                variant={days === option.days ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setDays(option.days)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
+
         </section>
 
         {dataIsStale && (
-          <p role="status" className="mb-4 text-sm text-amber-400">
+          <p role="status" className="mb-4 text-sm text-amber-800">
             {refreshFailed
-              ? "Nie udało się pobrać nowych danych. Wyświetlamy ostatnie dostępne statystyki."
-              : "Generator nie opublikował świeżych danych. Wyświetlane statystyki mogą być nieaktualne."}
+              ? "Nie możemy teraz odświeżyć wyników. Spróbuj ponownie za chwilę."
+              : "Wyświetlamy ostatnie dostępne wyniki. Mogą być nieaktualne."}
           </p>
         )}
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Dzisiaj" value={statsQuery.data?.summary.today} detail="od północy czasu polskiego" icon={Clock3} />
-          <StatCard label="Ostatnie 24 godziny" value={statsQuery.data?.summary.last24Hours} detail="ruchome okno dobowe" icon={Activity} />
-          <StatCard label="Ostatnie 7 dni" value={statsQuery.data?.summary.last7Days} detail="wszystkie rozpoznane odmiany" icon={BarChart3} />
-          <StatCard
-            label="Opóźnienie pipeline’u"
-            value={status?.lagSeconds == null ? undefined : Math.round(status.lagSeconds)}
-            detail={status?.modelName ? `sekundy · model ${status.modelName}` : "sekundy od transmisji"}
-            icon={Signal}
-          />
+        <section className="grid divide-y divide-stone-200 border-y border-stone-300 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+          <div className="bg-primary px-5 py-5 text-white" aria-label="Tusków na godzinę">
+            <p className="text-xs font-bold uppercase tracking-[0.12em]">Tusków na godzinę</p>
+            <div className="my-2 flex items-baseline gap-2">
+              <span className="font-display text-6xl font-bold tabular-nums">
+                {statsQuery.data?.summary.lastHour?.toLocaleString("pl-PL") ?? "—"}
+              </span>
+              <span className="text-sm text-white/85">/ godz.</span>
+            </div>
+            <p className="text-xs text-white/90">Wzmianki z ostatnich 60 minut</p>
+          </div>
+          <StatCard label="Dzisiaj" value={statsQuery.data?.summary.today} detail="wystąpień nazwiska Tusk" icon={Clock3} />
+          <StatCard label="Ostatnie 24 godziny" value={statsQuery.data?.summary.last24Hours} detail="wystąpień nazwiska Tusk" icon={Activity} />
+          <StatCard label="Ostatnie 7 dni" value={statsQuery.data?.summary.last7Days} detail="wystąpień nazwiska Tusk" icon={BarChart3} />
+
         </section>
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
+        <section id="analysis" className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
           <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <div>
+            <CardHeader className="flex-row flex-wrap items-start justify-between gap-x-5 gap-y-4">
+              <div className="min-w-0 flex-1 basis-64">
                 <CardTitle>Natężenie wystąpień</CardTitle>
-                <CardDescription className="mt-1">Liczba wykryć w wybranym okresie</CardDescription>
+                <CardDescription className="mt-1">Ile razy padło nazwisko Tusk w wybranym okresie</CardDescription>
               </div>
-              <Badge variant="secondary">łącznie {statsQuery.data?.range.total ?? "—"}</Badge>
+              <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-3">
+                <div role="group" aria-label="Zakres wykresu" className="flex gap-1">
+                  {availableRanges.map((option) => (
+                    <Button
+                      key={option.days}
+                      variant={days === option.days ? "default" : "ghost"}
+                      size="sm"
+                      aria-pressed={days === option.days}
+                      onClick={() => setDays(option.days)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+                <Badge variant="secondary" className="w-24 gap-1 px-2 tabular-nums">
+                  <span>łącznie</span>
+                  <span>{statsQuery.data?.range.total?.toLocaleString("pl-PL") ?? "—"}</span>
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
               {statsQuery.isLoading ? (
@@ -324,11 +324,11 @@ function App() {
               ) : chartData.length ? (
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <BarChart data={chartData} margin={{ left: -24, right: 8, top: 12 }}>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,.06)" />
+                    <CartesianGrid vertical={false} stroke="#e7e5e0" />
                     <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={12} minTickGap={24} />
                     <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                    <ChartTooltip cursor={{ fill: "rgba(255,255,255,.04)" }} content={<ChartTooltipContent />} />
-                    <Bar dataKey="count" fill="var(--color-count)" radius={[5, 5, 2, 2]} maxBarSize={34} />
+                    <ChartTooltip cursor={{ fill: "rgba(0,0,0,.04)" }} content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" fill="var(--color-count)" radius={[0, 0, 0, 0]} maxBarSize={34} />
                   </BarChart>
                 </ChartContainer>
               ) : (
@@ -357,8 +357,8 @@ function App() {
                         <span className="font-medium">{item.form}</span>
                         <span className="font-mono text-muted-foreground">{item.count}</span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(5, (item.count / max) * 100)}%` }} />
+                      <div className="h-1.5 overflow-hidden bg-stone-100">
+                        <div className="h-full bg-primary" style={{ width: `${Math.max(5, (item.count / max) * 100)}%` }} />
                       </div>
                     </div>
                   )
@@ -370,15 +370,14 @@ function App() {
           </Card>
         </section>
 
-        <section className="mt-6">
+        <section id="timeline" className="mt-10">
           <Card>
-            <CardHeader className="border-b border-white/[0.06] md:flex-row md:items-center md:justify-between">
+            <CardHeader className="border-b border-stone-200 md:flex-row md:items-center md:justify-between">
               <div>
-                <CardTitle>Oś czasu</CardTitle>
-                <CardDescription className="mt-1">Najnowsze wykryte wystąpienia wraz z kontekstem</CardDescription>
+                <CardTitle>Z anteny</CardTitle>
+                <CardDescription className="mt-1">Najnowsze wzmianki o Tusku</CardDescription>
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground md:mt-0">
-                <span className={cn("size-2 rounded-full", statusView.dot)} />
                 Ostatnia aktualizacja {status?.updatedAt ? formatTime(status.updatedAt) : "—"}
               </div>
             </CardHeader>
@@ -405,10 +404,10 @@ function App() {
                 </>
               ) : (
                 <div className="flex min-h-56 flex-col items-center justify-center text-center">
-                  <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-white/[0.04] text-muted-foreground">
+                  <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-stone-100 text-muted-foreground">
                     <SearchX className="size-5" />
                   </div>
-                  <p className="font-medium">Brak wykrytych wystąpień</p>
+                  <p className="font-medium">Brak wzmianek w tym okresie</p>
                   <p className="mt-1 text-sm text-muted-foreground">Nowe wyniki pojawią się tutaj automatycznie.</p>
                 </div>
               )}
@@ -416,17 +415,16 @@ function App() {
           </Card>
         </section>
 
-        <footer className="py-8 text-xs leading-5 text-muted-foreground">
+        <footer className="mt-8 border-t-2 border-foreground py-8 text-xs leading-5 text-muted-foreground">
           <section aria-labelledby="about-project" className="max-w-3xl space-y-2">
             <h2 id="about-project" className="text-sm font-medium text-foreground">O projekcie</h2>
             <p>
               Tuskometr jest niezależnym projektem analizy przekazu medialnego. Pokazuje częstotliwość
-              występowania nazwiska „Tusk” w monitorowanej transmisji Telewizji Republika.
+              występowania nazwiska „Tusk” na antenie Telewizji Republika.
             </p>
             <p>
-              Krótkie fragmenty automatycznej transkrypcji ilustrują wykryte wystąpienia; odnośniki
-              prowadzą do materiału źródłowego. Wyniki dotyczą przetworzonego materiału i mogą
-              zawierać błędy lub luki. Projekt nie jest powiązany z Telewizją Republika ani YouTube.
+              Przy wzmiankach znajdziesz krótkie cytaty i odnośniki do źródła. Wyniki i cytaty mogą
+              zawierać błędy lub pominięcia. Projekt nie jest powiązany z Telewizją Republika ani YouTube.
             </p>
             <p>Źródło: publiczna transmisja Telewizji Republika w YouTube.</p>
           </section>

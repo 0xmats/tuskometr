@@ -7,18 +7,22 @@ COPY apps/web/ ./apps/web/
 RUN npm run build:web
 
 FROM restic/restic:0.18.1 AS restic
+FROM denoland/deno:bin-2.9.6 AS deno
 
 FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    HF_HOME=/models/huggingface
+    HF_HOME=/models/huggingface \
+    DENO_DIR=/tmp/deno \
+    DENO_NO_UPDATE_CHECK=1
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ffmpeg curl tini \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=restic /usr/bin/restic /usr/local/bin/restic
+COPY --from=deno /deno /usr/local/bin/deno
 
 WORKDIR /app/apps/api
 COPY apps/api/pyproject.toml ./

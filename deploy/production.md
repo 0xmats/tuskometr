@@ -32,6 +32,11 @@ volumes when moving an existing production installation. The local project is
 If migrating from the old configuration, stop its `web` and `caddy` containers;
 the new production setup serves everything through Cloudflare.
 
+Compose starts `youtube-tokens` automatically. The worker uses its internal
+endpoint; no port or additional secret is needed. Releases check provider health
+before restarting the worker. Inspect `worker` and `youtube-tokens` logs if YouTube
+rejects a connection; token generation does not guarantee access from every IP.
+
 The publisher uploads changed files, then switches the manifest. It removes
 unreferenced objects after 24 hours. Do not add bucket lifecycle expiration or
 manually delete active files. Keep one publisher per bucket and preserve its

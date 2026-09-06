@@ -51,6 +51,8 @@ There are only two Compose files. Each is standalone; do not combine them.
 Local and production use separate project names, images and volumes.
 `npm run build:web` builds only the frontend; `npm run build:api` builds the Docker runtime.
 Production opens no incoming ports and includes remote backups.
+YouTube uses Deno and an automatic PO token provider, started by Compose.
+No manual token setup is required; YouTube can still restrict server IPs.
 See [backup and restore commands](deploy/backups.md).
 
 ## Checks
