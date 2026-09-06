@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@fontsource-variable/geist";
 
 @theme inline {
   --color-background: var(--background);
@@ -9,27 +10,27 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-ring: var(--ring);
-  --font-sans: "Inter", "Segoe UI", sans-serif;
-  --font-display: Georgia, "Times New Roman", serif;
+  --font-sans: "Geist Variable", "Segoe UI", sans-serif;
+  --font-display: "Geist Variable", "Segoe UI", sans-serif;
 }
 
 :root {
   color-scheme: light;
   --background: #ffffff;
-  --foreground: #202020;
+  --foreground: #192128;
   --card: #ffffff;
-  --card-foreground: #202020;
-  --primary: #b9232e;
+  --card-foreground: #192128;
+  --primary: #bc2635;
   --primary-foreground: #ffffff;
-  --muted-foreground: #66645f;
-  --ring: #b9232e;
-  font-family: "Inter", "Segoe UI", sans-serif;
+  --muted-foreground: #616a73;
+  --ring: #bc2635;
+  font-family: "Geist Variable", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 @layer base {
-  * { border-color: #deddd8; }
+  * { border-color: #e1e4e7; }
 }
 
 html {
@@ -68,7 +69,41 @@ a {
 }
 
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+
+h1, h2 { text-wrap: balance; }
+
+:where(a, button):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+
+section[id], h2[id] { scroll-margin-top: 24px; }
+
+.editorial-nav a {
+  position: relative;
+  padding-block: 16px;
+  transition: color 150ms ease;
+}
+
+.editorial-nav a:first-child::after {
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 3px;
+  background: var(--primary);
+  content: "";
+}
+
+.stat-grid > * + * { border-left: 1px solid #e1e4e7; }
+
+@media (max-width: 1279px) and (min-width: 640px) {
+  .stat-grid > :nth-child(3) { border-left: 0; }
+  .stat-grid > :nth-child(n + 3) { border-top: 1px solid #e1e4e7; }
+}
+
+@media (max-width: 639px) {
+  .stat-grid > * + * { border-left: 0; border-top: 1px solid #e1e4e7; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
