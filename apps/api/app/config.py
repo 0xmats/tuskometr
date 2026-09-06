@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     ytdlp_pot_provider_url: str = ""
     youtube_dvr_enabled: bool = True
     youtube_dvr_hours: float = Field(default=12, ge=0.1, le=12)
+    youtube_dvr_catchup_chunk_seconds: int = Field(default=300, ge=5, le=300)
 
     healthchecks_collecting_url: SecretStr = SecretStr("")
     healthchecks_publishing_url: SecretStr = SecretStr("")

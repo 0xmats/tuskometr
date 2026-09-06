@@ -75,7 +75,7 @@ def environment(monkeypatch):
     engine.dispose()
 
 
-def run_windows(settings, factory, count=1):
+def run_windows(settings, factory, count=1, sizes=None):
     worker = TuskometrWorker(settings, Transcriber())
     process = worker._process_window
     calls = []
@@ -83,6 +83,8 @@ def run_windows(settings, factory, count=1):
     async def tracked(*args, **kwargs):
         await process(*args, **kwargs)
         calls.append(args[2])
+        if sizes is not None:
+            sizes.append(len(args[1]) / (2 * settings.sample_rate))
         if len(calls) == count:
             worker.stop()
 
@@ -217,6 +219,7 @@ def test_replaying_committed_window_does_not_duplicate_mentions(environment):
 def test_window_steps_preserve_progress_without_dropping_audio(environment, monkeypatch, step):
     settings, factory = environment
     settings.chunk_step_seconds = step
+    settings.youtube_dvr_catchup_chunk_seconds = settings.chunk_seconds
     monkeypatch.setattr(FakeSource, "head_sequence", 200)
     # First resolve near 100, then expose enough data for three windows.
     monkeypatch.setattr(
@@ -449,3 +452,89 @@ def test_dvr_metadata_resolution_passes_configured_cookies_without_downloading_a
     assert "--skip-download" in command
     assert "--dump-single-json" in command
     assert "--no-warnings" not in command
+
+
+def test_catchup_batches_switch_to_live_without_gaps(environment, monkeypatch):
+    settings, factory = environment
+    run_windows(settings, factory)
+    with factory() as db:
+        start = db.scalar(select(DvrProgress)).next_sample
+    # 610s behind: two 300s windows with 5s overlap, then one live window.
+    monkeypatch.setattr(FakeSource, "head_sequence", 221)
+    sizes = []
+    calls = run_windows(settings, factory, count=3, sizes=sizes)
+    assert sizes == [300, 300, 25]
+    assert calls == [start, start + 295 * RATE, start + 590 * RATE]
+    with factory() as db:
+        progress = db.scalar(select(DvrProgress))
+        assert progress.next_sample == start + 610 * RATE
+        rows = list(db.scalars(select(TranscriptSegment).order_by(TranscriptSegment.id)))
+        for previous, current in zip(rows, rows[1:], strict=False):
+            assert previous.end_sample - current.start_sample == 5 * RATE
+        assert db.scalar(select(func.count()).select_from(IngestionGap)) == 0
+
+
+def test_large_window_failure_replays_same_position_after_restart(environment, monkeypatch):
+    settings, factory = environment
+    run_windows(settings, factory)
+    with factory() as db:
+        row = db.scalar(select(DvrProgress))
+        start, sequence = row.next_sample, row.next_sequence
+    monkeypatch.setattr(FakeSource, "head_sequence", 221)
+    worker = TuskometrWorker(settings, Transcriber())
+    lengths = []
+
+    def fail(pcm):
+        lengths.append(len(pcm) // (2 * RATE))
+        raise RuntimeError("ASR timeout")
+
+    monkeypatch.setattr(worker.transcriber, "transcribe_pcm", fail)
+    with pytest.raises(RuntimeError, match="ASR timeout"):
+        asyncio.run(DvrRunner(worker, factory).run())
+    assert lengths == [300]
+    with factory() as db:
+        row = db.scalar(select(DvrProgress))
+        assert (row.next_sample, row.next_sequence) == (start, sequence)
+        assert db.scalar(select(func.count()).select_from(TranscriptSegment)) == 1
+    sizes = []
+    assert run_windows(settings, factory, sizes=sizes) == [start]
+    assert sizes == [300]
+
+
+def test_catchup_size_can_be_set_to_two_minutes(environment, monkeypatch):
+    settings, factory = environment
+    settings.youtube_dvr_catchup_chunk_seconds = 120
+    run_windows(settings, factory)
+    monkeypatch.setattr(FakeSource, "head_sequence", 150)
+    sizes = []
+    run_windows(settings, factory, sizes=sizes)
+    assert sizes == [120]
+
+
+def test_large_to_small_window_deduplicates_boundary_mentions(environment, monkeypatch):
+    settings, factory = environment
+    run_windows(settings, factory)
+    monkeypatch.setattr(FakeSource, "head_sequence", 163)  # 320s backlog
+    results = iter([
+        TranscriptionResult("Tusk", [WordToken("Tusk", 297, 297.3, 0.95)], 0.95),
+        TranscriptionResult("Tusk", [WordToken("Tusk", 2, 2.3, 0.95)], 0.95),
+    ])
+    monkeypatch.setattr(Transcriber, "transcribe_pcm", lambda self, pcm: next(results))
+    sizes = []
+    calls = run_windows(settings, factory, count=2, sizes=sizes)
+    assert sizes == [300, 25]
+    with factory() as db:
+        matches = list(db.scalars(select(Occurrence).where(
+            Occurrence.source_sample >= calls[0],
+        )))
+        assert len(matches) == 1
+        assert matches[0].source_sample == calls[0] + 297 * RATE
+
+
+def test_short_backlog_uses_live_window_immediately(environment, monkeypatch):
+    settings, factory = environment
+    run_windows(settings, factory)
+    monkeypatch.setattr(FakeSource, "head_sequence", 150)  # 255s backlog
+    sizes = []
+    run_windows(settings, factory, sizes=sizes)
+    assert sizes == [25]

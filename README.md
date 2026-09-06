@@ -16,6 +16,17 @@ fragments oldest first, without real-time throttling. Audio stays in a bounded
 in-memory window; it is not archived on disk. Overlapping windows and replayed
 windows deduplicate mentions within the same source timeline.
 
+Backlogs of at least five minutes use 300-second transcription windows, advancing
+295 seconds with the default five-second overlap. Near the live head, the worker
+switches back to `CHUNK_SECONDS=25` / `CHUNK_STEP_SECONDS=20`; it does not wait for
+five minutes of fresh audio. Set `YOUTUBE_DVR_CATCHUP_CHUNK_SECONDS=120` for smaller
+catch-up requests, or set it equal to `CHUNK_SECONDS` to disable larger batches.
+The overlap follows the live window settings. Each window commits independently,
+so catch-up results appear in larger batches. A failed request retries from its
+unchanged checkpoint. Existing short segments can coexist with longer segments;
+no database migration is required. Five minutes of 16 kHz PCM uses about 9.6 MB
+per audio buffer (temporary copies and ASR memory are additional).
+
 The first activation starts with the next live fragment: earlier gaps cannot be
 reconstructed from the legacy worker's session-relative offsets. Subsequent
 interruptions recover automatically. If the saved position has left the DVR

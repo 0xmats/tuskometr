@@ -24,6 +24,17 @@ class DvrRunner:
         self.settings = worker.settings
         self.factory = factory
 
+    def window_sizes(self, head: Head, start_sample: int) -> tuple[int, int]:
+        rate = self.settings.sample_rate
+        live_seconds = self.settings.chunk_seconds
+        catchup_seconds = max(live_seconds, self.settings.youtube_dvr_catchup_chunk_seconds)
+        # Only batch audio already behind the live head; never wait five minutes
+        # for new audio to fill a catch-up window. Preserve the live overlap.
+        available_samples = round(head.position * rate) - start_sample
+        seconds = catchup_seconds if available_samples >= catchup_seconds * rate else live_seconds
+        overlap = live_seconds - self.settings.chunk_step_seconds
+        return seconds * rate, (seconds - overlap) * rate
+
     def prepare(self, source: YoutubeDvrSource, head: Head) -> DvrProgress:
         with self.factory() as db:
             row = db.scalar(
@@ -118,9 +129,6 @@ class DvrRunner:
                 head.sequence,
             )
             fragments: list[AudioFragment] = []
-            rate = self.settings.sample_rate
-            window_samples = self.settings.chunk_seconds * rate
-            step_samples = self.settings.chunk_step_seconds * rate
             while not self.worker.stop_event.is_set():
                 head = await source.head()
                 earliest = source.earliest_sequence(head)
@@ -153,15 +161,17 @@ class DvrRunner:
                 while len(fragments) > 1 and fragments[0].end_sample <= progress.next_sample:
                     fragments.pop(0)
                 start = fragments[0].start_sample
-                pcm = b"".join(item.pcm for item in fragments)
                 offset = progress.next_sample - start
                 if offset < 0:
                     raise SourceError("Nieprawidłowa pozycja wznowienia DVR")
-                if len(pcm) // 2 - offset < window_samples:
+                window_samples, _ = self.window_sizes(head, progress.next_sample)
+                if sum(len(item.pcm) for item in fragments) // 2 - offset < window_samples:
                     continue
-                while (
-                    len(pcm) // 2 - offset >= window_samples and not self.worker.stop_event.is_set()
-                ):
+                pcm = b"".join(item.pcm for item in fragments)
+                while not self.worker.stop_event.is_set():
+                    window_samples, step_samples = self.window_sizes(head, progress.next_sample)
+                    if len(pcm) // 2 - offset < window_samples:
+                        break
                     next_sample = progress.next_sample + step_samples
                     # With CHUNK_STEP_SECONDS == CHUNK_SECONDS the next window may
                     # begin exactly at the next, not-yet-downloaded source fragment.

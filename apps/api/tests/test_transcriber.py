@@ -118,3 +118,18 @@ def test_fuzzy_verification_crops_audio_and_uses_prompt(monkeypatch):
     assert "Tusk" in request["data"]["prompt"]
     with wave.open(io.BytesIO(request["files"]["file"][1])) as wav:
         assert wav.getnframes() == 13 * 16000
+
+
+def test_five_minute_audio_preserves_word_timestamps(monkeypatch):
+    post = Mock(return_value=httpx.Response(200, json={
+        "text": "Tusk", "words": [{"word": "Tusk", "start": 297, "end": 297.5}],
+    }))
+    monkeypatch.setattr("app.transcriber.httpx.post", post)
+    pcm = b"\0\0" * (300 * 16000)
+    result = ApiTranscriber(settings()).transcribe_pcm(pcm)
+    assert result.words[0].start == 297
+    assert result.words[0].end == 297.5
+    post.assert_called_once()
+    with wave.open(io.BytesIO(post.call_args.kwargs["files"]["file"][1])) as wav:
+        assert wav.getnframes() == 300 * 16000
+        assert wav.getframerate() == 16000
