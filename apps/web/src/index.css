@@ -108,3 +108,17 @@ section[id], h2[id] { scroll-margin-top: 24px; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+/* Pointer clicks select a time band; keyboard navigation keeps a visible focus. */
+.occurrence-chart .recharts-surface:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.occurrence-chart .recharts-surface:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.occurrence-chart .recharts-tooltip-cursor {
+  cursor: pointer;
+}

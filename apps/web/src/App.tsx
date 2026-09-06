@@ -10,7 +10,7 @@ import {
   RefreshCw,
   SearchX,
 } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis, usePlotArea } from "recharts"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -73,6 +73,21 @@ function formatBucket(value: string, days: number) {
     hour: days <= 1 ? "2-digit" : undefined,
     minute: days === 0 ? "2-digit" : undefined,
   }).format(new Date(value))
+}
+
+function ChartBands({ buckets, onSelect }: {
+  buckets: Array<{ start: string; end: string }>
+  onSelect: (bucket: { start: string; end: string }) => void
+}) {
+  const area = usePlotArea()
+  if (!area || !buckets.length) return null
+  const width = area.width / buckets.length
+  return <g aria-hidden="true">
+    {buckets.map((bucket, index) => <rect key={bucket.start}
+      data-chart-band={bucket.start}
+      x={area.x + index * width} y={area.y} width={width} height={area.height}
+      fill="transparent" cursor="pointer" onClick={() => onSelect(bucket)} />)}
+  </g>
 }
 
 function HighlightedQuote({ text }: { text: string }) {
@@ -386,7 +401,7 @@ function App() {
               {statsQuery.isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : chartData.length ? (
-                <ChartContainer config={chartConfig} className="h-[280px] w-full overflow-hidden">
+                <ChartContainer config={chartConfig} className="occurrence-chart h-[280px] w-full overflow-hidden">
                   <BarChart data={chartData} margin={{ left: -24, right: 8, top: 12 }}>
                     <CartesianGrid vertical={false} stroke="#e8ebee" strokeDasharray="3 3" />
                     <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={12} minTickGap={24} />
@@ -397,6 +412,7 @@ function App() {
                       {chartData.map((item) => <Cell key={item.start}
                         fillOpacity={!selectedBucket || selectedBucket.start === item.start ? 1 : 0.35} />)}
                     </Bar>
+                    <ChartBands buckets={chartData} onSelect={selectBucket} />
                   </BarChart>
                 </ChartContainer>
               ) : (
@@ -407,7 +423,7 @@ function App() {
               )}
               {chartData.length > 0 && (
                 <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span>Kliknij słupek, aby zobaczyć wzmianki.</span>
+                  <span>Kliknij przedział na wykresie, aby zobaczyć wzmianki.</span>
                   <select aria-label="Wybierz przedział wystąpień"
                     className="max-w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-foreground"
                     value={selectedBucket?.start ?? ""}
