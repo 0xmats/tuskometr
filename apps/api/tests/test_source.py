@@ -26,34 +26,11 @@ def test_youtube_source_resolves_to_direct_stream_url() -> None:
     assert url == "https://example.test/live.m3u8"
 
 
-def test_youtube_source_uses_automatic_token_provider(tmp_path) -> None:
-    process = AsyncMock()
-    process.returncode = 0
-    process.communicate.return_value = (b"https://example.test/audio\n", b"")
-    cookies = tmp_path / "cookies.txt"
-    cookies.write_text("# Netscape HTTP Cookie File\n")
-    source = ProcessAudioSource(Settings(
-        _env_file=None,
-        ytdlp_pot_provider_url="http://youtube-tokens:4416",
-        ytdlp_cookies_file=cookies,
-    ))
-    with patch("app.source.shutil.which", return_value="/usr/bin/tool"), patch(
-        "app.source.asyncio.create_subprocess_exec", return_value=process,
-    ) as launch:
-        assert asyncio.run(source._resolve_input()) == "https://example.test/audio"
-    args = launch.call_args.args
-    assert args[args.index("--js-runtimes") + 1] == "deno"
-    assert "youtube:player_client=mweb" in args
-    assert "youtubepot-bgutilhttp:base_url=http://youtube-tokens:4416" in args
-    assert args[args.index("--cookies") + 1] == str(cookies)
-
-
-def test_direct_source_does_not_use_youtube_token_provider() -> None:
+def test_direct_source_does_not_use_youtube_resolver() -> None:
     source = ProcessAudioSource(Settings(
         _env_file=None,
         source_mode="direct",
         source_url="https://example.test/live.m3u8",
-        ytdlp_pot_provider_url="http://youtube-tokens:4416",
     ))
     with patch("app.source.asyncio.create_subprocess_exec") as launch:
         assert asyncio.run(source._resolve_input()) == "https://example.test/live.m3u8"
@@ -79,12 +56,41 @@ def test_closing_source_drains_buffered_audio() -> None:
     asyncio.run(exercise())
 
 
-def test_empty_cookie_file_is_reported(tmp_path):
+def test_youtube_proxy_covers_resolver_and_ffmpeg_but_not_direct_sources():
+    proxy = "http://home.test:18888"
+    settings = Settings(_env_file=None, youtube_proxy_url=proxy)
+    source = ProcessAudioSource(settings)
+    process = AsyncMock()
+    process.returncode = 0
+    process.communicate.return_value = (b"https://example.test/audio\n", b"")
+    with patch("app.source.shutil.which", return_value="/usr/bin/tool"), patch(
+        "app.source.asyncio.create_subprocess_exec", return_value=process,
+    ) as launch:
+        url = asyncio.run(source._resolve_input())
+    args = launch.call_args.args
+    assert args[args.index("--proxy") + 1] == proxy
+    assert "--cookies" not in args
+    assert "--no-plugin-dirs" in args
+    assert "--extractor-args" not in args
+    args = source._ffmpeg_command(url)
+    assert args[args.index("-http_proxy") + 1] == proxy
+    assert args.index("-http_proxy") < args.index("-i")
+    settings.source_mode = "direct"
+    assert "-http_proxy" not in source._ffmpeg_command(url)
+
+
+def test_proxy_error_redacts_credentials():
+    from app.source import process_error
+
+    message = process_error(b"Cannot connect to http://user:private-password@home.test:18888")
+    assert "private-password" not in message
+    assert "Cannot connect" in message
+
+
+def test_proxy_configuration_rejects_unsupported_schemes():
     import pytest
+    from pydantic import ValidationError
 
-    from app.source import SourceError, validate_cookies_file
-
-    cookies = tmp_path / "cookies.txt"
-    cookies.touch()
-    with pytest.raises(SourceError, match="pusty"):
-        validate_cookies_file(Settings(_env_file=None, ytdlp_cookies_file=cookies))
+    for proxy in ("socks5://home:1080", "https://home:443", "http://home", "http://home:bad"):
+        with pytest.raises(ValidationError, match="HTTP proxy URL"):
+            Settings(_env_file=None, youtube_proxy_url=proxy)

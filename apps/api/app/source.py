@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,21 +13,18 @@ class SourceError(RuntimeError):
     pass
 
 
-def validate_cookies_file(settings: Settings) -> None:
-    path = settings.ytdlp_cookies_file
-    if path is None:
-        return
-    # yt-dlp treats a missing cookie file as a new, empty cookie jar. Fail
-    # explicitly instead of silently making unauthenticated requests after deploy.
-    try:
-        with path.open("rb") as cookies:
-            if not cookies.read(1):
-                raise SourceError("YTDLP_COOKIES_FILE: plik cookies jest pusty")
-    except OSError:
-        raise SourceError(
-            "YTDLP_COOKIES_FILE: plik cookies nie istnieje lub nie jest czytelny; "
-            "sprawdź ścieżkę i montowanie trwałego wolumenu",
-        ) from None
+def process_error(stderr: bytes) -> str:
+    """Keep useful diagnostics without exposing signed URLs or credentials."""
+    message = stderr.decode(errors="replace")
+    message = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", message)
+    message = re.sub(r"https?://\S+", "[URL]", message)
+    message = re.sub(
+        r"(?i)\b(authorization|cookie|po_token|pot|token|visitor_data|signature|sig)"
+        r"\s*[:=]\s*[^\r\n]+",
+        r"\1=[REDACTED]",
+        message,
+    )
+    return " ".join(message.split())[-1500:]
 
 
 @dataclass(slots=True)
@@ -50,11 +48,12 @@ class ProcessAudioSource:
     async def _resolve_input(self) -> str:
         if self.settings.source_mode != "youtube":
             return self.settings.source_url
-        validate_cookies_file(self.settings)
         if shutil.which("yt-dlp") is None:
             raise SourceError("Nie znaleziono yt-dlp w PATH")
         command = [
             "yt-dlp",
+            "--ignore-config",
+            "--no-plugin-dirs",
             "--no-warnings",
             "--no-playlist",
             "--format",
@@ -63,14 +62,8 @@ class ProcessAudioSource:
             "--js-runtimes",
             "deno",
         ]
-        if self.settings.ytdlp_pot_provider_url:
-            command.extend([
-                "--extractor-args", "youtube:player_client=mweb",
-                "--extractor-args",
-                f"youtubepot-bgutilhttp:base_url={self.settings.ytdlp_pot_provider_url}",
-            ])
-        if self.settings.ytdlp_cookies_file:
-            command.extend(["--cookies", str(self.settings.ytdlp_cookies_file)])
+        if proxy := self.settings.youtube_proxy_url.get_secret_value():
+            command.extend(["--proxy", proxy])
         command.append(self.settings.source_url)
         process = await asyncio.create_subprocess_exec(
             *command,
@@ -79,7 +72,7 @@ class ProcessAudioSource:
         )
         stdout, stderr = await process.communicate()
         if process.returncode != 0:
-            message = stderr.decode(errors="replace").strip()
+            message = process_error(stderr)
             raise SourceError(f"yt-dlp nie rozwiązał transmisji: {message[-500:]}")
         input_url = stdout.decode(errors="replace").strip()
         if not input_url:
@@ -88,6 +81,9 @@ class ProcessAudioSource:
 
     def _ffmpeg_command(self, input_url: str) -> list[str]:
         command = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error"]
+        if self.settings.source_mode == "youtube":
+            if proxy := self.settings.youtube_proxy_url.get_secret_value():
+                command.extend(["-http_proxy", proxy])
         if self.settings.source_mode == "youtube" or input_url.startswith(("http://", "https://")):
             command.extend(
                 [

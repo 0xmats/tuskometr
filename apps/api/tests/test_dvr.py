@@ -407,32 +407,9 @@ def test_process_error_reports_reason_without_signed_urls_or_tokens():
     asyncio.run(exercise())
 
 
-def test_dvr_missing_cookies_fails_before_contacting_youtube(tmp_path, monkeypatch):
-    from app.dvr import YoutubeDvrSource
-
-    process = AsyncMock()
-    monkeypatch.setattr("app.dvr.run_process", process)
-
-    async def exercise():
-        source = YoutubeDvrSource(Settings(
-            _env_file=None, ytdlp_cookies_file=tmp_path / "missing.txt",
-        ))
-        try:
-            with pytest.raises(SourceError, match="YTDLP_COOKIES_FILE"):
-                await source.open()
-        finally:
-            await source.close()
-    asyncio.run(exercise())
-    process.assert_not_called()
-
-
-def test_dvr_metadata_resolution_passes_configured_cookies_without_downloading_audio(
-    tmp_path, monkeypatch,
-):
+def test_dvr_metadata_resolution_is_anonymous_without_plugins_or_audio_download(monkeypatch):
     import json
 
-    cookies = tmp_path / "cookies.txt"
-    cookies.write_text("# Netscape HTTP Cookie File\n")
     process = AsyncMock(return_value=json.dumps({
         "id": "video", "live_status": "is_live", "target_duration": 5,
         "url": "https://example.test/audio?id=video.41",
@@ -440,7 +417,7 @@ def test_dvr_metadata_resolution_passes_configured_cookies_without_downloading_a
     monkeypatch.setattr("app.dvr.run_process", process)
 
     async def exercise():
-        source = YoutubeDvrSource(Settings(_env_file=None, ytdlp_cookies_file=cookies))
+        source = YoutubeDvrSource(Settings(_env_file=None))
         monkeypatch.setattr(source, "head", AsyncMock(return_value=Head(100, 500, NOW)))
         try:
             await source.open()
@@ -448,10 +425,54 @@ def test_dvr_metadata_resolution_passes_configured_cookies_without_downloading_a
             await source.close()
     asyncio.run(exercise())
     command = process.call_args.args
-    assert command[command.index("--cookies") + 1] == str(cookies)
+    assert "--cookies" not in command
+    assert "--no-plugin-dirs" in command
+    assert "--extractor-args" not in command
     assert "--skip-download" in command
     assert "--dump-single-json" in command
     assert "--no-warnings" not in command
+
+
+def test_dvr_sends_metadata_head_and_fragments_through_same_proxy(monkeypatch):
+    import json
+
+    async def exercise():
+        requests = []
+
+        async def proxy_connection(reader, writer):
+            try:
+                requests.append(await reader.readuntil(b"\r\n\r\n"))
+                writer.write(b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n")
+                await writer.drain()
+            finally:
+                writer.close()
+                await writer.wait_closed()
+
+        server = await asyncio.start_server(proxy_connection, "127.0.0.1", 0)
+        async with server:
+            proxy = f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+            process = AsyncMock(return_value=json.dumps({
+                "id": "video", "live_status": "is_live", "target_duration": 5,
+                "url": "https://media.invalid/audio?id=video.41",
+            }).encode())
+            monkeypatch.setattr("app.dvr.run_process", process)
+            source = YoutubeDvrSource(Settings(_env_file=None, youtube_proxy_url=proxy))
+            try:
+                with pytest.raises(SourceError, match="pozycji transmisji"):
+                    await source.open()
+                with pytest.raises(SourceError, match="segmentu DVR"):
+                    await source.fragment(100)
+            finally:
+                await source.close()
+            command = process.call_args.args
+            assert command[command.index("--proxy") + 1] == proxy
+            assert "--cookies" not in command
+            # Both requests fail at our proxy, rather than falling back to a
+            # direct connection (which would use a different public IP).
+            assert len(requests) == 2
+            assert all(r.startswith(b"CONNECT media.invalid:443 HTTP/1.1") for r in requests)
+
+    asyncio.run(exercise())
 
 
 def test_catchup_batches_switch_to_live_without_gaps(environment, monkeypatch):

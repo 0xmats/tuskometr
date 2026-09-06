@@ -457,6 +457,8 @@ async def async_main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    # Successful DVR requests include signed media URLs in httpx's INFO logs.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     worker = TuskometrWorker(get_settings())
     loop = asyncio.get_running_loop()
     for signal_name in (signal.SIGINT, signal.SIGTERM):

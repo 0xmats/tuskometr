@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import math
-import re
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -14,21 +13,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import httpx
 
 from .config import Settings
-from .source import SourceError, validate_cookies_file
-
-
-def process_error(stderr: bytes) -> str:
-    """Keep useful diagnostics without exposing signed URLs or credentials."""
-    message = stderr.decode(errors="replace")
-    message = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", message)
-    message = re.sub(r"https?://\S+", "[URL]", message)
-    message = re.sub(
-        r"(?i)\b(authorization|cookie|po_token|pot|token|visitor_data|signature|sig)"
-        r"\s*[:=]\s*[^\r\n]+",
-        r"\1=[REDACTED]",
-        message,
-    )
-    return " ".join(message.split())[-1500:]
+from .source import SourceError, process_error
 
 
 async def run_process(*command: str, data: bytes | None = None) -> bytes:
@@ -76,7 +61,10 @@ class AudioFragment:
 class YoutubeDvrSource:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.client = httpx.AsyncClient(timeout=30, follow_redirects=True)
+        self.client = httpx.AsyncClient(
+            timeout=30, follow_redirects=True,
+            proxy=settings.youtube_proxy_url.get_secret_value() or None,
+        )
         self.url = ""
         self.broadcast_id = ""
         self.fragment_seconds = 5.0
@@ -85,11 +73,11 @@ class YoutubeDvrSource:
         self._head_advanced = 0.0
 
     async def open(self) -> Head:
-        validate_cookies_file(self.settings)
         # mweb does not expose the adaptive formats needed for sequence-based DVR.
         command = [
             "yt-dlp",
             "--ignore-config",
+            "--no-plugin-dirs",
             "--no-playlist",
             "--js-runtimes",
             "deno",
@@ -99,15 +87,9 @@ class YoutubeDvrSource:
             "--format",
             "140",
         ]
-        if self.settings.ytdlp_pot_provider_url:
-            command.extend(
-                [
-                    "--extractor-args",
-                    f"youtubepot-bgutilhttp:base_url={self.settings.ytdlp_pot_provider_url}",
-                ]
-            )
-        if self.settings.ytdlp_cookies_file:
-            command.extend(["--cookies", str(self.settings.ytdlp_cookies_file)])
+        if proxy := self.settings.youtube_proxy_url.get_secret_value():
+            # Media requests must use the same egress as metadata.
+            command.extend(["--proxy", proxy])
         command.append(self.settings.source_url)
         info = json.loads(await run_process(*command))
         if info.get("live_status") != "is_live":

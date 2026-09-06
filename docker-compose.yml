@@ -1,16 +1,20 @@
 name: tuskometr-dev
 
 services:
-  youtube-tokens:
-    image: brainicism/bgutil-ytdlp-pot-provider:1.3.2
-    init: true
+  youtube-egress:
+    profiles: ["egress"]
+    build: ./deploy/youtube-egress
+    image: tuskometr-youtube-egress:local
+    network_mode: host
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4416/ping').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:size=1m,mode=1777
+    environment:
+      EGRESS_BIND_ADDRESS: ${EGRESS_BIND_ADDRESS:-127.0.0.1}
+      EGRESS_CLIENT_ADDRESS: ${EGRESS_CLIENT_ADDRESS:-127.0.0.1}
 
   web:
     build:
@@ -65,8 +69,6 @@ services:
     image: tuskometr:dev
     restart: unless-stopped
     depends_on:
-      youtube-tokens:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     command: ["python", "-m", "app.worker"]
@@ -97,8 +99,7 @@ services:
       YOUTUBE_DVR_HOURS: ${YOUTUBE_DVR_HOURS:-12}
       YOUTUBE_DVR_CATCHUP_CHUNK_SECONDS: ${YOUTUBE_DVR_CATCHUP_CHUNK_SECONDS:-300}
       YOUTUBE_HISTORY_ENABLED: ${YOUTUBE_HISTORY_ENABLED:-true}
-      YTDLP_POT_PROVIDER_URL: http://youtube-tokens:4416
-      YTDLP_COOKIES_FILE: ${YTDLP_COOKIES_FILE:-}
+      YOUTUBE_PROXY_URL: ${YOUTUBE_PROXY_URL:-}
       HF_HOME: /models/huggingface
     volumes:
       - ./apps/api/app:/app/apps/api/app:ro

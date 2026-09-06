@@ -2,13 +2,19 @@
 set -Eeuo pipefail
 release_dir="$(cd "$(dirname "$0")/.." && pwd)"
 root=/opt/tuskometr
-image="${1:?Pass the GHCR image digest}"
-registry_user="${2:?Pass the GHCR user}"
+image="${1:?Pass a GHCR image digest or locally built tuskometr:COMMIT image}"
+registry_user="${2:-}"
 initialize_backups="${3:-false}"
 [[ "$initialize_backups" == true || "$initialize_backups" == false ]]
 [[ "$release_dir" =~ ^/opt/tuskometr/releases/[a-f0-9]{40}$ ]]
-[[ "$image" =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
-[[ "$registry_user" =~ ^[A-Za-z0-9_-]+(\[bot\])?$ ]]
+local_image=false
+if [[ "$image" =~ ^tuskometr:[a-f0-9]{40}$ ]]; then
+  [[ "${image#tuskometr:}" == "${release_dir##*/}" ]]
+  local_image=true
+else
+  [[ "$image" =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+  [[ "$registry_user" =~ ^[A-Za-z0-9_-]+(\[bot\])?$ ]]
+fi
 cd "$release_dir"
 exec 9>"$root/.deploy.lock"
 flock -n 9
@@ -21,16 +27,22 @@ export TUSKOMETR_IMAGE="$image"
 export DOCKER_CONFIG
 DOCKER_CONFIG="$(mktemp -d)"
 trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-docker login ghcr.io --username "$registry_user" --password-stdin
 compose=(docker compose -f docker-compose.prod.yml)
 "${compose[@]}" config --quiet
-"${compose[@]}" pull
+if [[ "$local_image" == true ]]; then
+  docker image inspect "$image" >/dev/null
+else
+  docker login ghcr.io --username "$registry_user" --password-stdin
+  "${compose[@]}" pull
+fi
 if [[ "$initialize_backups" == true ]]; then
   "${compose[@]}" run --rm --no-deps backup python -m app.backup init
 fi
 # Check the existing private backup repository before changing running services.
 "${compose[@]}" run --rm --no-deps backup python -m app.backup list
-"${compose[@]}" up -d --no-build --wait --wait-timeout 90 youtube-tokens
+# Resolve a fresh URL and decode actual audio before interrupting ingestion.
+# This also catches an unreachable home proxy before changing running services.
+"${compose[@]}" run --rm --no-deps worker python -m app.youtube_check
 "${compose[@]}" stop worker publisher backup
 # Back up an existing database before running migrations. Fresh volumes have no DB.
 "${compose[@]}" run --rm --no-deps backup python -c '
@@ -72,9 +84,14 @@ for attempt in range(24):
 else:
     raise SystemExit('Publisher did not produce a fresh manifest; inspect VPS logs')
 PY
-for service in youtube-tokens worker publisher backup; do
+for service in worker publisher backup; do
   test -n "$("${compose[@]}" ps --status running -q "$service")"
 done
 printf 'TUSKOMETR_IMAGE=%s\n' "$image" > .release.env
 ln -sfn "$release_dir" "$root/current"
+# Retire the old token provider only after the new release is verified.
+while read -r container; do
+  [[ -z "$container" ]] || docker rm -f "$container"
+done < <(docker ps -aq --filter label=com.docker.compose.project=tuskometr \
+  --filter label=com.docker.compose.service=youtube-tokens)
 echo 'Backend deployed. No database rollback is performed automatically on failure.'

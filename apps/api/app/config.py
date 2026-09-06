@@ -38,8 +38,7 @@ class Settings(BaseSettings):
     chunk_step_seconds: int = Field(default=20, ge=2, le=120)
     sample_rate: int = Field(default=16_000, ge=8_000, le=48_000)
     max_audio_queue_seconds: int = Field(default=90, ge=30, le=900)
-    ytdlp_cookies_file: Path | None = None
-    ytdlp_pot_provider_url: str = ""
+    youtube_proxy_url: SecretStr = SecretStr("")
     youtube_dvr_enabled: bool = True
     youtube_dvr_hours: float = Field(default=12, ge=0.1, le=12)
     youtube_dvr_catchup_chunk_seconds: int = Field(default=300, ge=5, le=300)
@@ -76,10 +75,26 @@ class Settings(BaseSettings):
             raise ValueError("CHUNK_STEP_SECONDS must not exceed CHUNK_SECONDS")
         return value
 
-    @field_validator("ytdlp_cookies_file", mode="before")
+    @field_validator("youtube_proxy_url")
     @classmethod
-    def empty_cookie_path_is_none(cls, value):
-        return None if value in (None, "") else value
+    def validate_youtube_proxy(cls, value: SecretStr) -> SecretStr:
+        from urllib.parse import urlsplit
+
+        raw = value.get_secret_value()
+        if not raw:
+            return value
+        try:
+            parts = urlsplit(raw)
+            valid = (
+                parts.scheme == "http" and parts.hostname and parts.port
+                and parts.path in ("", "/") and not parts.query and not parts.fragment
+                and not any(char.isspace() for char in raw)
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError("YOUTUBE_PROXY_URL must be an HTTP proxy URL with an explicit port")
+        return value
 
 
 @lru_cache
