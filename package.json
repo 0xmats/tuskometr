@@ -10,6 +10,10 @@
   ],
   "scripts": {
     "dev": "bash scripts/dev-server.sh",
+    "dev:full": "bash scripts/dev-server.sh --full",
+    "dev:start": "bash scripts/frontend-control.sh start",
+    "dev:stop": "bash scripts/frontend-control.sh stop",
+    "dev:status": "bash scripts/frontend-control.sh status",
     "dev:web": "npm run dev --workspace @tuskometr/web --",
     "dev:api": "docker compose up --build web publisher worker backup",
     "build": "npm run build:api && npm run build:web",

@@ -70,6 +70,8 @@ export function useYouTubeTimelineOrigin(videoId: string): number | null {
   const [origin, setOrigin] = useState<number | null>(null)
 
   useEffect(() => {
+    // Offline frontend fixtures must not initialize a hidden YouTube player.
+    if (import.meta.env.DEV && import.meta.env.VITE_MOCK_DATA === "true") return
     let disposed = false
     let player: YouTubePlayer | undefined
     let calibrationTimer: number | undefined

@@ -1,0 +1,560 @@
+{
+  "description": "Synthetic frontend fixtures; no real broadcasts or production data. Edit this JSON and the preview reloads.",
+  "historyDays": 45,
+  "staleAfterSeconds": 31536000,
+  "status": {
+    "state": "live",
+    "lagSeconds": 8,
+    "reconnectCount": 0,
+    "message": null,
+    "modelName": "demo"
+  },
+  "occurrences": [
+    {
+      "id": 1,
+      "minutesAgo": 1,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 2,
+      "minutesAgo": 2,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 3,
+      "minutesAgo": 3,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 4,
+      "minutesAgo": 5,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 5,
+      "minutesAgo": 8,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 6,
+      "minutesAgo": 8.5,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 7,
+      "minutesAgo": 12,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 8,
+      "minutesAgo": 16,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    },
+    {
+      "id": 9,
+      "minutesAgo": 21,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.954
+    },
+    {
+      "id": 10,
+      "minutesAgo": 25,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.967
+    },
+    {
+      "id": 11,
+      "minutesAgo": 26,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 12,
+      "minutesAgo": 33,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 13,
+      "minutesAgo": 41,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 14,
+      "minutesAgo": 44,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 15,
+      "minutesAgo": 50,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 16,
+      "minutesAgo": 58,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 17,
+      "minutesAgo": 75,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 18,
+      "minutesAgo": 100,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    },
+    {
+      "id": 19,
+      "minutesAgo": 125,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.954
+    },
+    {
+      "id": 20,
+      "minutesAgo": 150,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.967
+    },
+    {
+      "id": 21,
+      "minutesAgo": 175,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 22,
+      "minutesAgo": 200,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 23,
+      "minutesAgo": 225,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 24,
+      "minutesAgo": 250,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 25,
+      "minutesAgo": 275,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 26,
+      "minutesAgo": 300,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 27,
+      "minutesAgo": 325,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 28,
+      "minutesAgo": 350,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    },
+    {
+      "id": 29,
+      "minutesAgo": 375,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.954
+    },
+    {
+      "id": 30,
+      "minutesAgo": 400,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.967
+    },
+    {
+      "id": 31,
+      "minutesAgo": 425,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 32,
+      "minutesAgo": 450,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 33,
+      "minutesAgo": 475,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 34,
+      "minutesAgo": 500,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 35,
+      "minutesAgo": 525,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 36,
+      "minutesAgo": 550,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 37,
+      "minutesAgo": 575,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 38,
+      "minutesAgo": 600,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    },
+    {
+      "id": 39,
+      "minutesAgo": 625,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.954
+    },
+    {
+      "id": 40,
+      "minutesAgo": 650,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.967
+    },
+    {
+      "id": 41,
+      "minutesAgo": 675,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 42,
+      "minutesAgo": 700,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 43,
+      "minutesAgo": 725,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 44,
+      "minutesAgo": 750,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 45,
+      "minutesAgo": 775,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 46,
+      "minutesAgo": 800,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 47,
+      "minutesAgo": 825,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 48,
+      "minutesAgo": 850,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    },
+    {
+      "id": 49,
+      "minutesAgo": 875,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.954
+    },
+    {
+      "id": 50,
+      "minutesAgo": 900,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.967
+    },
+    {
+      "id": 51,
+      "minutesAgo": 925,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 52,
+      "minutesAgo": 950,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 53,
+      "minutesAgo": 975,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 54,
+      "minutesAgo": 1000,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 55,
+      "minutesAgo": 1025,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 56,
+      "minutesAgo": 1050,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 57,
+      "minutesAgo": 1075,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 58,
+      "minutesAgo": 1100,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    },
+    {
+      "id": 59,
+      "minutesAgo": 1125,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.954
+    },
+    {
+      "id": 60,
+      "minutesAgo": 1150,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.967
+    },
+    {
+      "id": 61,
+      "minutesAgo": 1175,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 62,
+      "minutesAgo": 1500,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 63,
+      "minutesAgo": 1600,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 64,
+      "minutesAgo": 1900,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 65,
+      "minutesAgo": 2300,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 66,
+      "minutesAgo": 2800,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 67,
+      "minutesAgo": 3100,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 68,
+      "minutesAgo": 4000,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    },
+    {
+      "id": 69,
+      "minutesAgo": 5500,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.954
+    },
+    {
+      "id": 70,
+      "minutesAgo": 8000,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.967
+    },
+    {
+      "id": 71,
+      "minutesAgo": 9500,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.85
+    },
+    {
+      "id": 72,
+      "minutesAgo": 12000,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.863
+    },
+    {
+      "id": 73,
+      "minutesAgo": 15000,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.876
+    },
+    {
+      "id": 74,
+      "minutesAgo": 19000,
+      "form": "Tuskiem",
+      "quote": "Przykładowa zapowiedź rozmowy z Donaldem Tuskiem, przygotowana do testów interfejsu.",
+      "confidence": 0.889
+    },
+    {
+      "id": 75,
+      "minutesAgo": 25000,
+      "form": "Tusku",
+      "quote": "Goście rozmawiają o Tusku. To dane demonstracyjne, nie zapis rzeczywistej audycji.",
+      "confidence": 0.902
+    },
+    {
+      "id": 76,
+      "minutesAgo": 30000,
+      "form": "Tusk",
+      "quote": "Przykładowy materiał: Donald Tusk pojawia się w zapowiedzi programu.",
+      "confidence": 0.915
+    },
+    {
+      "id": 77,
+      "minutesAgo": 39000,
+      "form": "Tuska",
+      "quote": "Przykładowa rozmowa dotyczy dzisiejszego wystąpienia Tuska.",
+      "confidence": 0.928
+    },
+    {
+      "id": 78,
+      "minutesAgo": 42000,
+      "form": "Tuskowi",
+      "quote": "W tym fikcyjnym fragmencie prowadzący zadaje pytanie Tuskowi.",
+      "confidence": 0.941
+    }
+  ]
+}

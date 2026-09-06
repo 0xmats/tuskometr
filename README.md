@@ -81,27 +81,60 @@ default clients and AAC format 140; it does not force the live-only `mweb` clien
 
 ## Run locally
 
-Requires Docker Compose and Node.js 22+. Local transcription needs a reasonably
-fast CPU and about 8 GB RAM; use OVH API to reduce local resource requirements.
+For frontend work, only Node.js 22+ is needed:
 
 ```bash
-cp .env.example .env
 npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:3003`. The frontend reloads automatically; restart the relevant
-container after backend edits. Set `ASR_PROVIDER=ovh` and `ASR_API_KEY` in `.env`
-to use OVH instead of local transcription. Leave `VITE_DATA_ORIGIN` unset locally.
+Open `http://127.0.0.1:3003`. Changes to the frontend reload automatically. Stop
+with Ctrl+C. This starts only Vite and uses the editable synthetic fixture
+[`apps/web/dev/dashboard.json`](apps/web/dev/dashboard.json). Saving that JSON
+reloads the preview. No connection to production or YouTube is made, and no
+local ingestion, transcription, publisher or database starts.
 
-To run the built dashboard without the development server:
+The fixture contains relative `minutesAgo` timestamps, sample quotes and pipeline
+status. Dates are anchored to the moment the fixture loads. Charts, summary
+counts, form counts, pagination and bucket filtering are derived from the same
+rows for all four ranges. Adjust `historyDays` to test range availability and
+`status.state` to test offline states. `staleAfterSeconds` is deliberately large
+for a stable design preview; lower it to test the stale-data notice. Source-video
+links are unavailable in mock mode because no YouTube player is loaded.
+
+To opt into real published JSON, set `TUSKOMETR_DATA_ORIGIN` in the root `.env`
+(or the shell), for example `https://data.tuskometr.com`, then restart the preview.
+Vite proxies those requests without changing production CORS. Leave the setting
+empty for the default offline fixtures. Mock data is served only in development
+and is not included in the production build.
+
+On the home Linux device, run the preview in the background:
 
 ```bash
-npm start
+npm run dev:start
+npm run dev:stop
+npm run dev:status
 ```
 
-Open `http://127.0.0.1:8000`. Stop with `docker compose down`; never add `-v`
-unless you intend to delete the stored data.
+The bundled systemd user service exposes it at `http://100.80.64.94:3003`.
+It does not start automatically at boot. The unit contains this device's paths;
+use `npm run dev` on other machines. Stop the background preview before running
+`npm run dev` in a terminal, since both use port 3003.
+
+To explicitly run the full local processing stack (requires Docker Compose):
+
+```bash
+npm run dev:full
+```
+
+This starts local ingestion, transcription, publishing and the frontend, using
+local JSON on port 8000. Ctrl+C stops that stack. Local transcription needs a
+reasonably fast CPU and about 8 GB RAM; alternatively set `ASR_PROVIDER=ovh` and
+`ASR_API_KEY` in `.env`. `npm start` also starts the full built Docker stack;
+`npm stop` stops it. Avoid `docker compose down -v`, which deletes local data.
+
+The production home proxy uses the separate `tuskometr-egress` Compose project.
+All of these development start/stop commands leave that proxy running.
 
 ## Production
 
