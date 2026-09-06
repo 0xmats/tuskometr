@@ -47,6 +47,15 @@ const YOUTUBE_DVR_SECONDS = 12 * 60 * 60
 const LINK_PREROLL_SECONDS = 3
 
 
+function hourlyFrequencyLabel(count: number | undefined) {
+  if (count === undefined) return "Brak danych z ostatnich 60 minut"
+  if (count === 0) return "Brak wystąpień w ostatnich 60 minutach"
+  const seconds = Math.max(1, Math.round(3600 / count))
+  const plural = new Intl.PluralRules("pl-PL").select(seconds)
+  const unit = plural === "one" ? "sekundę" : plural === "few" ? "sekundy" : "sekund"
+  return `Tusk pada średnio co ${seconds.toLocaleString("pl-PL")} ${unit}`
+}
+
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("pl-PL", {
     timeZone: "Europe/Warsaw",
@@ -369,7 +378,7 @@ function App() {
               </span>
               <span className="text-sm text-white/85">/ godz.</span>
             </div>
-            <p className="text-xs text-white/90">Wzmianki z ostatnich 60 minut</p>
+            <p className="text-xs text-white/90">{hourlyFrequencyLabel(statsQuery.data?.summary.lastHour)}</p>
           </div>
           <StatCard label="Dzisiaj" value={statsQuery.data?.summary.today} detail="wystąpień nazwiska Tusk" icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={statsQuery.data?.summary.last24Hours} detail="wystąpień nazwiska Tusk" icon={Activity} />
