@@ -8,6 +8,7 @@ from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
 from .db import SessionLocal, init_db
@@ -16,7 +17,7 @@ from .detection import (
     find_candidates,
     materialize_occurrence,
 )
-from .models import Occurrence, PipelineState, SourceSession, TranscriptSegment
+from .models import DvrProgress, Occurrence, PipelineState, SourceSession, TranscriptSegment
 from .source import ProcessAudioSource, SourceError, validate_source
 from .transcriber import Transcriber, TranscriptionResult, WhisperTranscriber, create_transcriber
 
@@ -55,7 +56,12 @@ class TuskometrWorker:
         attempt = 0
         while not self.stop_event.is_set():
             try:
-                await self._run_source_session()
+                if self.settings.source_mode == "youtube" and self.settings.youtube_dvr_enabled:
+                    from .dvr_runner import DvrRunner
+
+                    await DvrRunner(self, SessionLocal).run()
+                else:
+                    await self._run_source_session()
                 if not self.stop_event.is_set():
                     raise SourceError("Transmisja zakończyła się bez sygnału końca pracy")
             except asyncio.CancelledError:
@@ -163,6 +169,7 @@ class TuskometrWorker:
         pcm: bytes,
         start_sample: int,
         session_started_at: datetime,
+        dvr_checkpoint: tuple[int, int, int] | None = None,
     ) -> None:
         assert self.transcriber is not None
         chunk_started_at = session_started_at + timedelta(
@@ -173,13 +180,6 @@ class TuskometrWorker:
         duration_seconds = len(pcm) / 2 / self.settings.sample_rate
         chunk_finished_at = chunk_started_at + timedelta(seconds=duration_seconds)
         lag = max(0.0, (datetime.now(UTC) - chunk_finished_at).total_seconds())
-        segment_id = self._store_segment(
-            source_session_id=source_session_id,
-            start_sample=start_sample,
-            pcm=pcm,
-            chunk_started_at=chunk_started_at,
-            result=result,
-        )
 
         detections: list[DetectedOccurrence] = []
         for candidate in find_candidates(result.words):
@@ -206,7 +206,25 @@ class TuskometrWorker:
                     verified_confidence=verified_confidence,
                 )
             )
-        self._store_occurrences(source_session_id, segment_id, detections)
+        # Results and the next DVR position must commit together. A crash or
+        # verification/DB failure leaves the same window available for replay.
+        with SessionLocal.begin() as db:
+            segment_id = self._store_segment(
+                db=db,
+                source_session_id=source_session_id,
+                start_sample=start_sample,
+                pcm=pcm,
+                chunk_started_at=chunk_started_at,
+                result=result,
+            )
+            self._store_occurrences(db, source_session_id, segment_id, detections)
+            if dvr_checkpoint is not None:
+                progress_id, next_sequence, next_sample = dvr_checkpoint
+                progress = db.get(DvrProgress, progress_id)
+                if progress is None:
+                    raise RuntimeError("Brak checkpointu DVR")
+                progress.next_sequence = next_sequence
+                progress.next_sample = next_sample
         self._update_state(
             "live",
             last_transcript_at=datetime.now(UTC),
@@ -292,6 +310,7 @@ class TuskometrWorker:
 
     def _store_segment(
         self,
+        db: Session,
         source_session_id: int,
         start_sample: int,
         pcm: bytes,
@@ -302,66 +321,65 @@ class TuskometrWorker:
         duration = len(pcm) / 2 / self.settings.sample_rate
         expires_at = datetime.now(UTC) + timedelta(days=self.settings.transcript_retention_days)
         checksum = hashlib.sha256(result.text.encode()).hexdigest()
-        with SessionLocal() as db:
-            existing = db.scalar(
-                select(TranscriptSegment).where(
-                    TranscriptSegment.source_session_id == source_session_id,
-                    TranscriptSegment.start_sample == start_sample,
-                    TranscriptSegment.end_sample == end_sample,
-                )
+        existing = db.scalar(
+            select(TranscriptSegment).where(
+                TranscriptSegment.source_session_id == source_session_id,
+                TranscriptSegment.start_sample == start_sample,
+                TranscriptSegment.end_sample == end_sample,
             )
-            if existing:
-                return existing.id
-            row = TranscriptSegment(
-                source_session_id=source_session_id,
-                started_at=chunk_started_at,
-                ended_at=chunk_started_at + timedelta(seconds=duration),
-                start_sample=start_sample,
-                end_sample=end_sample,
-                text=result.text,
-                average_confidence=result.average_confidence,
-                checksum=checksum,
-                expires_at=expires_at,
-            )
-            db.add(row)
-            db.commit()
-            return row.id
+        )
+        if existing:
+            return existing.id
+        row = TranscriptSegment(
+            source_session_id=source_session_id,
+            started_at=chunk_started_at,
+            ended_at=chunk_started_at + timedelta(seconds=duration),
+            start_sample=start_sample,
+            end_sample=end_sample,
+            text=result.text,
+            average_confidence=result.average_confidence,
+            checksum=checksum,
+            expires_at=expires_at,
+        )
+        db.add(row)
+        db.flush()
+        return row.id
 
     def _store_occurrences(
         self,
+        db: Session,
         source_session_id: int,
         segment_id: int,
         detections: list[DetectedOccurrence],
     ) -> None:
         tolerance_samples = round(self.settings.sample_rate * 0.75)
-        with SessionLocal() as db:
-            for detection in detections:
-                duplicate = db.scalar(
-                    select(Occurrence.id).where(
-                        Occurrence.source_session_id == source_session_id,
-                        Occurrence.normalized_form == detection.normalized_form,
-                        Occurrence.source_sample.between(
-                            detection.source_sample - tolerance_samples,
-                            detection.source_sample + tolerance_samples,
-                        ),
-                    )
+        for detection in detections:
+            duplicate = db.scalar(
+                select(Occurrence.id).where(
+                    Occurrence.source_session_id == source_session_id,
+                    Occurrence.normalized_form == detection.normalized_form,
+                    Occurrence.source_sample.between(
+                        detection.source_sample - tolerance_samples,
+                        detection.source_sample + tolerance_samples,
+                    ),
                 )
-                if duplicate:
-                    continue
-                db.add(
-                    Occurrence(
-                        source_session_id=source_session_id,
-                        segment_id=segment_id,
-                        occurred_at=detection.occurred_at,
-                        source_sample=detection.source_sample,
-                        form=detection.form,
-                        normalized_form=detection.normalized_form,
-                        quote=detection.quote,
-                        confidence=detection.confidence,
-                        source_position_seconds=detection.source_position_seconds,
-                    )
+            )
+            if duplicate:
+                continue
+            db.add(
+                Occurrence(
+                    source_session_id=source_session_id,
+                    segment_id=segment_id,
+                    occurred_at=detection.occurred_at,
+                    source_sample=detection.source_sample,
+                    form=detection.form,
+                    normalized_form=detection.normalized_form,
+                    quote=detection.quote,
+                    confidence=detection.confidence,
+                    source_position_seconds=detection.source_position_seconds,
                 )
-            db.commit()
+            )
+            db.flush()
 
     def _touch_audio(self) -> None:
         self._update_state("live", last_audio_at=datetime.now(UTC), last_error=None)

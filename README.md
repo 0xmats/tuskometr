@@ -6,6 +6,35 @@ A live dashboard counting mentions of “Tusk” in a Polish TV stream.
 - **Production:** the VPS processes audio and uploads JSON to R2; Cloudflare Pages hosts the frontend.
 - SQLite keeps transcripts for 30 days and detected mentions indefinitely. Audio is not stored.
 
+## Recovery after interruptions
+
+YouTube ingestion uses its DVR window by default (`YOUTUBE_DVR_ENABLED=true`,
+`YOUTUBE_DVR_HOURS=12`). SQLite stores the stream generation, source sequence and
+next audio sample. Transcripts, mentions and progress commit in one transaction.
+After a worker restart or a source/ASR error, the worker downloads the outstanding
+fragments oldest first, without real-time throttling. Audio stays in a bounded
+in-memory window; it is not archived on disk. Overlapping windows and replayed
+windows deduplicate mentions within the same source timeline.
+
+The first activation starts with the next live fragment: earlier gaps cannot be
+reconstructed from the legacy worker's session-relative offsets. Subsequent
+interruptions recover automatically. If the saved position has left the DVR
+window, the worker records an interval in `ingestion_gaps`, logs a warning and
+continues from the oldest allowed fragment (with two fragments of margin).
+A changed encoder generation starts a new source session and resumes by time
+where available. HTTP/decoding errors inside the window are retried, not skipped.
+
+The `DVR: wznawianie…` log reports the saved and current source sequences;
+`lag` reports how far processing is behind the source clock. Media positions are
+preserved across restarts. Their UTC anchor is estimated once from YouTube's head
+headers, with accuracy of approximately one source fragment (about 5 seconds).
+Keep `SAMPLE_RATE` unchanged while resuming the same stream generation.
+
+Migration `0004` adds the progress and gap tables; the normal deployment runs it.
+Set `YOUTUBE_DVR_ENABLED=false` to use the previous live-only reader. File and
+direct URL sources retain their existing behavior. DVR extraction uses yt-dlp's
+default clients and AAC format 140; it does not force the live-only `mweb` client.
+
 ## Structure
 
 - `apps/web`: React/Vite frontend (npm workspace).

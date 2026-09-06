@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     max_audio_queue_seconds: int = Field(default=90, ge=30, le=900)
     ytdlp_cookies_file: Path | None = None
     ytdlp_pot_provider_url: str = ""
+    youtube_dvr_enabled: bool = True
+    youtube_dvr_hours: float = Field(default=12, ge=0.1, le=12)
 
     frontend_dist: Path = Path("/app/static")
     dashboard_storage: Literal["local", "r2"] = "local"

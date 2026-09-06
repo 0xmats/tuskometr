@@ -119,3 +119,34 @@ class PipelineState(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
     )
+
+
+class DvrProgress(Base):
+    __tablename__ = "dvr_progress"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    broadcast_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    source_session_id: Mapped[int] = mapped_column(
+        ForeignKey("source_sessions.id"), nullable=False,
+    )
+    time_origin: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    sample_rate: Mapped[int] = mapped_column(Integer, nullable=False)
+    next_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    next_sample: Mapped[int | None] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now,
+    )
+
+
+class IngestionGap(Base):
+    __tablename__ = "ingestion_gaps"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now,
+    )
