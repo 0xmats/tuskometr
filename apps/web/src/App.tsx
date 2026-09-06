@@ -82,9 +82,17 @@ function ChartBands({ buckets, onSelect }: {
   const area = usePlotArea()
   if (!area || !buckets.length) return null
   const width = area.width / buckets.length
-  return <g aria-hidden="true">
+  return <g>
     {buckets.map((bucket, index) => <rect key={bucket.start}
       data-chart-band={bucket.start}
+      role="button" tabIndex={0}
+      aria-label={`Pokaż wzmianki: ${formatDate(bucket.start)}, ${formatTime(bucket.start)}–${formatTime(bucket.end)}`}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onSelect(bucket)
+        }
+      }}
       x={area.x + index * width} y={area.y} width={width} height={area.height}
       fill="transparent" cursor="pointer" onClick={() => onSelect(bucket)} />)}
   </g>
@@ -419,23 +427,6 @@ function App() {
                 <div className="flex h-[280px] flex-col items-center justify-center text-center text-muted-foreground">
                   <SearchX className="mb-3 size-7" />
                   <p className="text-sm">Brak wystąpień w tym okresie</p>
-                </div>
-              )}
-              {chartData.length > 0 && (
-                <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span>Kliknij przedział na wykresie, aby zobaczyć wzmianki.</span>
-                  <select aria-label="Wybierz przedział wystąpień"
-                    className="max-w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-foreground"
-                    value={selectedBucket?.start ?? ""}
-                    onChange={(event) => {
-                      const bucket = chartData.find((item) => item.start === event.target.value)
-                      if (bucket) selectBucket(bucket)
-                    }}>
-                    <option value="">Wybierz przedział</option>
-                    {chartData.map((item) => <option key={item.start} value={item.start}>
-                      {formatDate(item.start)}, {item.label} — {item.count} wystąpień
-                    </option>)}
-                  </select>
                 </div>
               )}
             </CardContent>
