@@ -7,10 +7,10 @@ A live dashboard counting mentions of “Tusk” in a Polish TV stream.
 - SQLite keeps transcripts for 30 days and detected mentions indefinitely. Audio is not stored.
 
 The dashboard lists mentions by broadcast time, newest first, including backfilled
-results. Clicking a chart bar (or choosing its interval from the list) shows all
+results. Clicking a time band on the chart shows all
 mentions in that interval; “Wróć do live” restores the current list. The last-hour
-chart uses minute buckets. The 7-day range appears once stored history spans 24 hours; the 30-day
-range appears after 30 days. Publishers include static per-bucket pages, so filtering does
+chart uses minute buckets. The 7-day range appears after more than 24 hours of
+history; the 30-day range appears after more than 7 days. Publishers include static per-bucket pages, so filtering does
 not query the production database. Deploy both publisher and frontend for these
 features; no database migration is needed.
 

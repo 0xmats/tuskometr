@@ -37,12 +37,17 @@ console.log('R2 cross-origin data, pagination and freshness checks passed')
 const at = (id, time) => ({ id, occurredAt: `2026-01-01T${time}:00Z` })
 const rows = [at(99, '11:20'), at(2, '12:10'), at(3, '12:10'), at(1, '13:00')]
 assert.deepEqual(api.sortOccurrences([...rows, rows[0]]).map(x => x.id), [1, 3, 2, 99])
+for (const days of [0, 1]) {
+  assert.equal(api.rangeAvailable(days, undefined), true)
+  assert.equal(api.rangeAvailable(days, { historyStartedAt: dashboard.generatedAt }, dashboard.generatedAt), true)
+}
 for (const days of [7, 30]) {
   assert.equal(api.rangeAvailable(days, {}, dashboard.generatedAt), false)
   const stats = { historyStartedAt: '2026-01-01T00:00:00Z' }
-  const boundary = Date.parse(stats.historyStartedAt) + (days === 7 ? 1 : days) * 86400000
+  const boundary = Date.parse(stats.historyStartedAt) + (days === 7 ? 1 : 7) * 86400000
   assert.equal(api.rangeAvailable(days, stats, new Date(boundary - 1).toISOString()), false)
-  assert.equal(api.rangeAvailable(days, stats, new Date(boundary).toISOString()), true)
+  assert.equal(api.rangeAvailable(days, stats, new Date(boundary).toISOString()), false)
+  assert.equal(api.rangeAvailable(days, stats, new Date(boundary + 1).toISOString()), true)
 }
 const start = '2026-01-01T12:00:00Z'
 const end = '2026-01-01T13:00:00Z'

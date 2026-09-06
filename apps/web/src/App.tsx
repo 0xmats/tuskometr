@@ -44,6 +44,8 @@ const formsPattern = /\b(tusk|tuska|tuskowi|tuskiem|tusku|tuskowie|tusków|tusko
 const normalizedForms = new Set(["tusk", "tuska", "tuskowi", "tuskiem", "tusku", "tuskowie", "tusków", "tuskom", "tuskami", "tuskach"])
 const SOURCE_VIDEO_ID = "dzntyCTgJMQ"
 const YOUTUBE_DVR_SECONDS = 12 * 60 * 60
+// Empirical correction for early playback in YouTube links.
+const LINK_OFFSET_SECONDS = 4
 const LINK_PREROLL_SECONDS = 3
 
 
@@ -155,7 +157,7 @@ function sourceMomentUrl(item: Occurrence, timelineOrigin: number | null) {
   if (timelineOrigin === null) return null
   const occurrenceSeconds = Date.parse(item.occurredAt) / 1_000
   const ageSeconds = Date.now() / 1_000 - occurrenceSeconds
-  const position = Math.floor(occurrenceSeconds - timelineOrigin - LINK_PREROLL_SECONDS)
+  const position = Math.floor(occurrenceSeconds - timelineOrigin + LINK_OFFSET_SECONDS - LINK_PREROLL_SECONDS)
   if (!Number.isFinite(position) || position < 0 || ageSeconds > YOUTUBE_DVR_SECONDS) return null
 
   const url = new URL(item.sourceUrl)
@@ -280,8 +282,9 @@ function App() {
       animations.push(element.animate([
         { opacity: 0, transform: "translateY(-8px)", backgroundColor: "color-mix(in srgb, var(--primary) 9%, transparent)" },
         { opacity: 1, transform: "translateY(0)", backgroundColor: "color-mix(in srgb, var(--primary) 6%, transparent)", offset: 0.35 },
+        { opacity: 1, transform: "translateY(0)", backgroundColor: "color-mix(in srgb, var(--primary) 6%, transparent)", offset: 0.55 },
         { opacity: 1, transform: "translateY(0)", backgroundColor: "transparent" },
-      ], { duration: 900, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }))
+      ], { duration: 1300, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }))
     })
     return () => animations.forEach((animation) => animation.cancel())
   }, [days, occurrencesQuery.data, occurrencesQuery.isPlaceholderData, selectedBucket])

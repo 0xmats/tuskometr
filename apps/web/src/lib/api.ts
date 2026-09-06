@@ -143,8 +143,8 @@ export function sortOccurrences(items: Occurrence[]): Occurrence[] {
 export function rangeAvailable(days: number, stats: Stats | undefined, generatedAt?: string): boolean {
   if (days < 7) return true
   if (!stats?.historyStartedAt || !generatedAt) return false
-  const requiredDays = days === 7 ? 1 : days
-  return Date.parse(generatedAt) - Date.parse(stats.historyStartedAt) >= requiredDays * 86_400_000
+  const requiredDays = days === 7 ? 1 : 7
+  return Date.parse(generatedAt) - Date.parse(stats.historyStartedAt) > requiredDays * 86_400_000
 }
 
 export async function fetchBucketOccurrences(
