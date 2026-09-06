@@ -12,6 +12,23 @@ class SourceError(RuntimeError):
     pass
 
 
+def validate_cookies_file(settings: Settings) -> None:
+    path = settings.ytdlp_cookies_file
+    if path is None:
+        return
+    # yt-dlp treats a missing cookie file as a new, empty cookie jar. Fail
+    # explicitly instead of silently making unauthenticated requests after deploy.
+    try:
+        with path.open("rb") as cookies:
+            if not cookies.read(1):
+                raise SourceError("YTDLP_COOKIES_FILE: plik cookies jest pusty")
+    except OSError:
+        raise SourceError(
+            "YTDLP_COOKIES_FILE: plik cookies nie istnieje lub nie jest czytelny; "
+            "sprawdź ścieżkę i montowanie trwałego wolumenu",
+        ) from None
+
+
 @dataclass(slots=True)
 class ProcessAudioSource:
     settings: Settings
@@ -33,6 +50,7 @@ class ProcessAudioSource:
     async def _resolve_input(self) -> str:
         if self.settings.source_mode != "youtube":
             return self.settings.source_url
+        validate_cookies_file(self.settings)
         if shutil.which("yt-dlp") is None:
             raise SourceError("Nie znaleziono yt-dlp w PATH")
         command = [

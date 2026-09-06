@@ -37,6 +37,30 @@ endpoint; no port or additional secret is needed. Releases check provider health
 before restarting the worker. Inspect `worker` and `youtube-tokens` logs if YouTube
 rejects a connection; token generation does not guarantee access from every IP.
 
+If the VPS needs YouTube login cookies, keep the Netscape-format file in a
+persistent worker volume, for example `/models/youtube-cookies.txt`, and set
+`YTDLP_COOKIES_FILE=/models/youtube-cookies.txt` in `/opt/tuskometr/.env`.
+The file must be readable and writable by UID 10001 (mode 600 is sufficient).
+`/models` and `/data` survive normal releases; a file copied into `/tmp` or the
+container's writable layer does not. The worker rejects a configured missing or
+empty file. A file's existence alone does not establish that its login is valid.
+
+For a metadata-only diagnostic using the worker's configured cookies and token
+provider, run this from `/opt/tuskometr/current`:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T worker sh -c '
+  yt-dlp --ignore-config --no-playlist --js-runtimes deno \
+    --live-from-start --skip-download --print format_id --format 140 \
+    --cookies "$YTDLP_COOKIES_FILE" \
+    --extractor-args "youtubepot-bgutilhttp:base_url=$YTDLP_POT_PROVIDER_URL" \
+    "$SOURCE_URL"
+'
+```
+
+Use this command when `YTDLP_COOKIES_FILE` is configured. Running yt-dlp manually
+without `--cookies` does not use that environment variable automatically.
+
 The publisher uploads changed files, then switches the manifest. It removes
 unreferenced objects after 24 hours. Do not add bucket lifecycle expiration or
 manually delete active files. Keep one publisher per bucket and preserve its

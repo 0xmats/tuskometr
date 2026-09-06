@@ -26,6 +26,6 @@ if [[ -n "$("${compose[@]}" ps --status running -q worker publisher backup migra
 fi
 "${compose[@]}" run --rm --no-deps backup python -m app.backup activate \
   --offline --output "$candidate"
-"${compose[@]}" run --rm --no-deps migrate
+"${compose[@]}" up --no-build --no-deps --force-recreate --exit-code-from migrate migrate
 "${compose[@]}" up -d worker publisher backup
 echo 'Database restored; services started. Check logs and dashboard freshness.'

@@ -381,3 +381,71 @@ def test_collecting_heartbeat_follows_commit_even_without_mentions(environment, 
     with pytest.raises(RuntimeError, match="write failed"):
         asyncio.run(worker._process_window(session_id, b"\0\0" * (25 * RATE), RATE, NOW))
     assert calls == [1]
+
+
+def test_process_error_reports_reason_without_signed_urls_or_tokens():
+    import sys
+
+    from app.dvr import run_process
+
+    async def exercise():
+        with pytest.raises(SourceError) as error:
+            await run_process(
+                sys.executable, "-c",
+                "import sys; sys.stderr.write('ERROR: Sign in to confirm you are not a bot. '"
+                "'https://example.test/audio?secret=private-token\\n'"
+                "'Cookie: SID=private-cookie\\n'); sys.exit(1)",
+            )
+        message = str(error.value)
+        assert "Sign in to confirm" in message
+        assert "kod 1" in message
+        assert "private-token" not in message
+        assert "private-cookie" not in message
+    asyncio.run(exercise())
+
+
+def test_dvr_missing_cookies_fails_before_contacting_youtube(tmp_path, monkeypatch):
+    from app.dvr import YoutubeDvrSource
+
+    process = AsyncMock()
+    monkeypatch.setattr("app.dvr.run_process", process)
+
+    async def exercise():
+        source = YoutubeDvrSource(Settings(
+            _env_file=None, ytdlp_cookies_file=tmp_path / "missing.txt",
+        ))
+        try:
+            with pytest.raises(SourceError, match="YTDLP_COOKIES_FILE"):
+                await source.open()
+        finally:
+            await source.close()
+    asyncio.run(exercise())
+    process.assert_not_called()
+
+
+def test_dvr_metadata_resolution_passes_configured_cookies_without_downloading_audio(
+    tmp_path, monkeypatch,
+):
+    import json
+
+    cookies = tmp_path / "cookies.txt"
+    cookies.write_text("# Netscape HTTP Cookie File\n")
+    process = AsyncMock(return_value=json.dumps({
+        "id": "video", "live_status": "is_live", "target_duration": 5,
+        "url": "https://example.test/audio?id=video.41",
+    }).encode())
+    monkeypatch.setattr("app.dvr.run_process", process)
+
+    async def exercise():
+        source = YoutubeDvrSource(Settings(_env_file=None, ytdlp_cookies_file=cookies))
+        monkeypatch.setattr(source, "head", AsyncMock(return_value=Head(100, 500, NOW)))
+        try:
+            await source.open()
+        finally:
+            await source.close()
+    asyncio.run(exercise())
+    command = process.call_args.args
+    assert command[command.index("--cookies") + 1] == str(cookies)
+    assert "--skip-download" in command
+    assert "--dump-single-json" in command
+    assert "--no-warnings" not in command

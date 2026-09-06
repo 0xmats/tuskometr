@@ -31,6 +31,7 @@ def test_youtube_source_uses_automatic_token_provider(tmp_path) -> None:
     process.returncode = 0
     process.communicate.return_value = (b"https://example.test/audio\n", b"")
     cookies = tmp_path / "cookies.txt"
+    cookies.write_text("# Netscape HTTP Cookie File\n")
     source = ProcessAudioSource(Settings(
         _env_file=None,
         ytdlp_pot_provider_url="http://youtube-tokens:4416",
@@ -76,3 +77,14 @@ def test_closing_source_drains_buffered_audio() -> None:
         assert source.process.returncode is not None
 
     asyncio.run(exercise())
+
+
+def test_empty_cookie_file_is_reported(tmp_path):
+    import pytest
+
+    from app.source import SourceError, validate_cookies_file
+
+    cookies = tmp_path / "cookies.txt"
+    cookies.touch()
+    with pytest.raises(SourceError, match="pusty"):
+        validate_cookies_file(Settings(_env_file=None, ytdlp_cookies_file=cookies))

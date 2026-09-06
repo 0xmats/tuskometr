@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import re
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -13,7 +14,21 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import httpx
 
 from .config import Settings
-from .source import SourceError
+from .source import SourceError, validate_cookies_file
+
+
+def process_error(stderr: bytes) -> str:
+    """Keep useful diagnostics without exposing signed URLs or credentials."""
+    message = stderr.decode(errors="replace")
+    message = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", message)
+    message = re.sub(r"https?://\S+", "[URL]", message)
+    message = re.sub(
+        r"(?i)\b(authorization|cookie|po_token|pot|token|visitor_data|signature|sig)"
+        r"\s*[:=]\s*[^\r\n]+",
+        r"\1=[REDACTED]",
+        message,
+    )
+    return " ".join(message.split())[-1500:]
 
 
 async def run_process(*command: str, data: bytes | None = None) -> bytes:
@@ -21,12 +36,18 @@ async def run_process(*command: str, data: bytes | None = None) -> bytes:
         *command,
         stdin=asyncio.subprocess.PIPE if data is not None else asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
     )
     try:
-        output, _ = await asyncio.wait_for(process.communicate(data), timeout=60)
+        try:
+            output, stderr = await asyncio.wait_for(process.communicate(data), timeout=60)
+        except TimeoutError:
+            raise SourceError(f"{command[0]}: przekroczono czas odczytu DVR (60s)") from None
         if process.returncode:
-            raise SourceError(f"{command[0]}: błąd odczytu DVR (kod {process.returncode})")
+            detail = process_error(stderr) or "brak szczegółów na stderr"
+            raise SourceError(
+                f"{command[0]}: błąd odczytu DVR (kod {process.returncode}): {detail}",
+            )
         return output
     finally:
         if process.returncode is None:
@@ -64,11 +85,11 @@ class YoutubeDvrSource:
         self._head_advanced = 0.0
 
     async def open(self) -> Head:
+        validate_cookies_file(self.settings)
         # mweb does not expose the adaptive formats needed for sequence-based DVR.
         command = [
             "yt-dlp",
             "--ignore-config",
-            "--no-warnings",
             "--no-playlist",
             "--js-runtimes",
             "deno",

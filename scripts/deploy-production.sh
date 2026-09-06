@@ -40,7 +40,9 @@ p = Path("/data/tuskometr.db")
 if p.exists():
     backup_once(p, Path("/backups"), 7)
 '
-"${compose[@]}" run --rm --no-deps migrate
+# Keep the canonical migration service on the release image. A one-off `run`
+# leaves an old migrate container behind, which later `compose start` can reuse.
+"${compose[@]}" up --no-build --no-deps --force-recreate --exit-code-from migrate migrate
 "${compose[@]}" up -d --no-build --no-deps worker publisher backup
 # Verify a new R2 manifest from this publisher, without relying on CDN caches.
 "${compose[@]}" exec -T publisher python - <<'PY'
