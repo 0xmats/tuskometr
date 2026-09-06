@@ -67,9 +67,8 @@ jobs:
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
-          for key in VPS_HOST VPS_USER VPS_PORT VITE_DATA_ORIGIN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_PAGES_PROJECT CF_TOKEN SSH_KEY KNOWN_HOSTS; do
+          for key in VPS_HOST VPS_USER VPS_PORT VITE_DATA_ORIGIN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_PAGES_PROJECT CF_TOKEN SSH_KEY; do
             test -n "${!key}" || { echo "Missing setting: $key" >&2; exit 1; }
           done
           [[ "$VITE_DATA_ORIGIN" =~ ^https://[^/]+$ ]]
@@ -80,7 +79,7 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh-keyscan -p "$VPS_PORT" "$VPS_HOST" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
       - uses: actions/setup-node@v4
         with:

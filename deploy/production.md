@@ -65,7 +65,6 @@ Create the GitHub environment `production` with these settings:
 | Secret | `VPS_HOST` | SSH hostname/IP reachable from GitHub-hosted runners |
 | Secret | `VPS_USER` | Deployment user with Docker access |
 | Secret | `VPS_SSH_KEY` | Private deployment key |
-| Secret | `VPS_KNOWN_HOSTS` | Verified SSH host-key entry, including port if nonstandard |
 | Secret | `CLOUDFLARE_API_TOKEN` | Account token with Cloudflare Pages Edit |
 | Variable | `VPS_PORT` | Optional SSH port, default `22` |
 | Variable | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID |
@@ -80,7 +79,7 @@ first release. Leave it disabled for subsequent releases or an existing reposito
 Actions initializes backups using the pulled image; no checkout or build is needed
 on the VPS. Do not add runtime R2/OVH credentials to GitHub.
 An address available only inside Tailscale is not reachable from this runner setup.
-Verify the SSH host key through your existing trusted connection or VPS console.
+The workflow populates SSH known hosts using `ssh-keyscan` during deployment.
 
 Releases live in `/opt/tuskometr/releases/<commit>`; `current` points to the last
 successful backend release. Shared Docker volumes remain under project `tuskometr`.
