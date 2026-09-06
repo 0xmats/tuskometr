@@ -172,8 +172,9 @@ function sourceMomentUrl(item: Occurrence, timelineOrigin: number | null) {
   return url.toString()
 }
 
-function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrigin: number | null }) {
-  const momentUrl = sourceMomentUrl(item, timelineOrigin)
+function TimelineItem({ item, timeline }: { item: Occurrence; timeline: ReturnType<typeof useYouTubeTimelineOrigin> }) {
+  const momentUrl = sourceMomentUrl(item, timeline.origin)
+  const withinDvr = Date.now() / 1000 - Date.parse(item.occurredAt) / 1000 <= YOUTUBE_DVR_SECONDS
   return (
     <article data-occurrence-id={item.id} className="group relative grid gap-3 border-b border-slate-200 py-6 last:border-0 md:grid-cols-[108px_1fr_auto] md:gap-6">
       <div>
@@ -194,6 +195,18 @@ function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrig
               Zobacz fragment
             </a>
           </Button>
+        ) : withinDvr && (timeline.status === "loading" || timeline.status === "retrying") ? (
+          <Button disabled variant="outline" size="sm">
+            <RefreshCw className="size-4 motion-safe:animate-spin" />
+            {timeline.status === "retrying" ? "Ponawianie…" : "Przygotowywanie fragmentu…"}
+          </Button>
+        ) : withinDvr && timeline.status === "error" ? (
+          <div className="flex flex-col items-start gap-2">
+            <span className="text-xs text-muted-foreground">Nie udało się przygotować fragmentu.</span>
+            <Button variant="outline" size="sm" onClick={timeline.retry}>
+              <RefreshCw className="size-4" />Spróbuj ponownie
+            </Button>
+          </div>
         ) : (
           <Button asChild variant="outline" size="sm">
             <a href={item.sourceUrl} target="_blank" rel="noreferrer">
@@ -265,7 +278,7 @@ function App() {
     refetchOnWindowFocus: true,
   })
   const manifest = manifestQuery.data
-  const timelineOrigin = useYouTubeTimelineOrigin(SOURCE_VIDEO_ID)
+  const timeline = useYouTubeTimelineOrigin(SOURCE_VIDEO_ID)
   const occurrencesQuery = useInfiniteQuery({
     queryKey: ["dashboard", days, manifest?.version],
     queryFn: ({ pageParam }) => fetchDashboard(pageParam),
@@ -537,7 +550,7 @@ function App() {
               ) : occurrences.length ? (
                 <>
                   <div ref={timelineRef}>
-                    {occurrences.map((item) => <TimelineItem key={item.id} item={item} timelineOrigin={timelineOrigin} />)}
+                    {occurrences.map((item) => <TimelineItem key={item.id} item={item} timeline={timeline} />)}
                   </div>
                   {!selectedBucket && occurrencesQuery.hasNextPage && (
                     <div className="flex justify-center pt-5">
