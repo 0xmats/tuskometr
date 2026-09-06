@@ -105,17 +105,31 @@ export async function fetchDashboard(url: string, signal?: AbortSignal): Promise
   const [path, fragment] = url.split("#")
   const dashboard = await request<Dashboard>(path, signal)
   if (!dashboard.historyPages) return dashboard
-  const page = fragment ? Number(fragment) : 0
-  if (!Number.isInteger(page) || page < 0 || page > dashboard.historyPages.length) {
+  const parts = (fragment ?? "0").split(":")
+  let page = Number(parts[0])
+  let offset = parts.length === 2 ? Number(parts[1]) : 0
+  if (parts.length > 2 || !Number.isInteger(page) || page < 0 ||
+      page > dashboard.historyPages.length || !Number.isInteger(offset) || offset < 0) {
     throw new Error("Nieprawidłowa strona historii")
   }
-  const items = page === 0 ? dashboard.occurrences.items
-    : (await request<{ items: Occurrence[] }>(dashboard.historyPages[page - 1], signal)).items
+  const items: Occurrence[] = []
+  while (page <= dashboard.historyPages.length && items.length < 30) {
+    const chunk = page === 0 ? dashboard.occurrences.items
+      : (await request<{ items: Occurrence[] }>(dashboard.historyPages[page - 1], signal)).items
+    if (offset > chunk.length) throw new Error("Nieprawidłowa strona historii")
+    const selected = chunk.slice(offset, offset + 30 - items.length)
+    items.push(...selected)
+    offset += selected.length
+    if (offset === chunk.length) {
+      page += 1
+      offset = 0
+    }
+  }
   return {
     ...dashboard,
     occurrences: {
       items,
-      nextPage: page < dashboard.historyPages.length ? `${path}#${page + 1}` : null,
+      nextPage: page <= dashboard.historyPages.length ? `${path}#${page}:${offset}` : null,
     },
   }
 }
@@ -129,7 +143,8 @@ export function sortOccurrences(items: Occurrence[]): Occurrence[] {
 export function rangeAvailable(days: number, stats: Stats | undefined, generatedAt?: string): boolean {
   if (days < 7) return true
   if (!stats?.historyStartedAt || !generatedAt) return false
-  return Date.parse(generatedAt) - Date.parse(stats.historyStartedAt) >= days * 86_400_000
+  const requiredDays = days === 7 ? 1 : days
+  return Date.parse(generatedAt) - Date.parse(stats.historyStartedAt) >= requiredDays * 86_400_000
 }
 
 export async function fetchBucketOccurrences(

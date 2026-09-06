@@ -9,8 +9,8 @@ A live dashboard counting mentions of “Tusk” in a Polish TV stream.
 The dashboard lists mentions by broadcast time, newest first, including backfilled
 results. Clicking a chart bar (or choosing its interval from the list) shows all
 mentions in that interval; “Wróć do live” restores the current list. The last-hour
-chart uses minute buckets. The 7- and 30-day ranges appear once the stored history
-spans those periods. Publishers include static per-bucket pages, so filtering does
+chart uses minute buckets. The 7-day range appears once stored history spans 24 hours; the 30-day
+range appears after 30 days. Publishers include static per-bucket pages, so filtering does
 not query the production database. Deploy both publisher and frontend for these
 features; no database migration is needed.
 

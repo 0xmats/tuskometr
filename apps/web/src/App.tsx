@@ -323,14 +323,10 @@ function App() {
     <div className="min-h-screen">
       <a href="#overview" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-foreground focus:px-4 focus:py-3 focus:text-white">Przejdź do treści</a>
       <header className="mx-auto max-w-[1280px] px-5 md:px-8">
-        <div className="flex items-center justify-between gap-4 border-b border-slate-200 py-3 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          <span>Niezależny monitoring mediów</span>
-          <a href="#about-project" className="shrink-0 hover:text-primary">O projekcie ↗</a>
-        </div>
         <div className="flex flex-wrap items-center justify-between gap-5 py-8 md:py-10">
           <div>
             <h1 className="font-display text-5xl font-semibold tracking-[-0.065em] sm:text-7xl">Tuskometr<span className="text-primary">.</span></h1>
-            <p className="mt-2 text-xs text-muted-foreground sm:text-sm">Polityka na antenie. Liczby, cytaty, kontekst.</p>
+            <p className="mt-2 text-xs text-muted-foreground sm:text-sm">Wzmianki o Tusku w Telewizji Republika.</p>
           </div>
           {status?.state === "live" && (
             <span className="flex items-center gap-2.5 rounded-full border border-primary/15 bg-primary/5 px-3.5 py-2 text-[10px] font-semibold tracking-[0.12em] text-primary" aria-label="Na żywo">
@@ -343,23 +339,20 @@ function App() {
           )}
         </div>
         <nav aria-label="Sekcje strony" className="editorial-nav flex flex-wrap gap-x-6 gap-y-0 border-t border-t-foreground border-b border-b-slate-200 text-[11px] font-semibold sm:gap-x-8 sm:text-xs">
-          <a href="#overview" className="text-primary">Republika pod lupą</a>
-          <a href="#analysis" className="hover:text-primary">W liczbach</a>
-          <a href="#timeline" className="hover:text-primary">Z anteny</a>
+          <a href="#overview" className="text-primary">Podsumowanie</a>
+          <a href="#analysis" className="hover:text-primary">Wykres</a>
+          <a href="#timeline" className="hover:text-primary">Wzmianki</a>
+          <a href="#about-project" className="hover:text-primary">O projekcie</a>
         </nav>
       </header>
 
       <main className="mx-auto max-w-[1280px] px-5 py-9 md:px-8 md:py-12">
-        <section id="overview" className="mb-9 grid gap-5 lg:grid-cols-[1.45fr_1fr] lg:items-end lg:gap-16">
+        <section id="overview" className="mb-9">
           <div className="max-w-2xl">
-            <p className="mb-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary"><Radio className="size-3.5" /> Temat obserwacji · Donald Tusk</p>
             <h2 className="font-display text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.045em] md:text-5xl xl:text-[3.5rem]">
               Ile razy padło nazwisko <span className="text-primary">Tusk?</span>
             </h2>
           </div>
-          <p className="max-w-md text-sm leading-7 text-muted-foreground lg:border-l lg:border-slate-200 lg:pl-6 lg:text-base">
-            Jak często Telewizja Republika mówi o Tusku? Sprawdź liczby i zobacz, w jakim kontekście pada jego nazwisko.
-          </p>
         </section>
 
         {dataIsStale && (
@@ -475,7 +468,7 @@ function App() {
           <Card>
             <CardHeader className="border-b border-slate-200 md:flex-row md:items-center md:justify-between">
               <div>
-                <CardTitle>Z anteny</CardTitle>
+                <CardTitle>Wzmianki</CardTitle>
                 <CardDescription className="mt-1">
                   {selectedBucket ? selectedBucket.label : "Najnowsze wzmianki według czasu wystąpienia"}
                 </CardDescription>
@@ -531,12 +524,11 @@ function App() {
           <section aria-labelledby="about-project" className="max-w-3xl space-y-2">
             <h2 id="about-project" className="text-sm font-medium text-foreground">O projekcie</h2>
             <p>
-              Tuskometr jest niezależnym projektem analizy przekazu medialnego. Pokazuje częstotliwość
-              występowania nazwiska „Tusk” na antenie Telewizji Republika.
+              Tuskometr liczy wystąpienia nazwiska „Tusk” w transmisji Telewizji Republika.
             </p>
             <p>
-              Przy wzmiankach znajdziesz krótkie cytaty i odnośniki do źródła. Wyniki i cytaty mogą
-              zawierać błędy lub pominięcia. Projekt nie jest powiązany z Telewizją Republika ani YouTube.
+              Transkrypcje są automatyczne i mogą zawierać błędy. Projekt nie jest powiązany
+              z Telewizją Republika ani YouTube.
             </p>
             <p>Źródło: publiczna transmisja Telewizji Republika w YouTube.</p>
           </section>
