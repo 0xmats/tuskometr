@@ -105,14 +105,11 @@ unless you intend to delete the stored data.
 
 ## Production
 
-Complete the one-time [Cloudflare and VPS setup](deploy/production.md), then:
-
-```bash
-npm run prod:up
-```
-
-To release through GitHub Actions, configure the `production` environment as
-described in the setup guide, then run **Build, Test and Deploy** from `main`.
+Complete the one-time [Cloudflare and VPS setup](deploy/production.md), configure
+the GitHub `production` environment, then run **Build, Test and Deploy** from
+`main`. Production deployments use GitHub Actions exclusively: CI builds and
+pushes the image to GHCR; the VPS receives deployment files and pulls the image.
+Do not copy application sources or build images on the VPS.
 
 There are only two Compose files. Each is standalone; do not combine them.
 Local and production use separate project names, images and volumes.

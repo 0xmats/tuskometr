@@ -2,19 +2,13 @@
 set -Eeuo pipefail
 release_dir="$(cd "$(dirname "$0")/.." && pwd)"
 root=/opt/tuskometr
-image="${1:?Pass a GHCR image digest or locally built tuskometr:COMMIT image}"
-registry_user="${2:-}"
+image="${1:?Pass the GHCR image digest}"
+registry_user="${2:?Pass the GHCR user}"
 initialize_backups="${3:-false}"
 [[ "$initialize_backups" == true || "$initialize_backups" == false ]]
 [[ "$release_dir" =~ ^/opt/tuskometr/releases/[a-f0-9]{40}$ ]]
-local_image=false
-if [[ "$image" =~ ^tuskometr:[a-f0-9]{40}$ ]]; then
-  [[ "${image#tuskometr:}" == "${release_dir##*/}" ]]
-  local_image=true
-else
-  [[ "$image" =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
-  [[ "$registry_user" =~ ^[A-Za-z0-9_-]+(\[bot\])?$ ]]
-fi
+[[ "$image" =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+[[ "$registry_user" =~ ^[A-Za-z0-9_-]+(\[bot\])?$ ]]
 cd "$release_dir"
 exec 9>"$root/.deploy.lock"
 flock -n 9
@@ -29,12 +23,8 @@ DOCKER_CONFIG="$(mktemp -d)"
 trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 compose=(docker compose -f docker-compose.prod.yml)
 "${compose[@]}" config --quiet
-if [[ "$local_image" == true ]]; then
-  docker image inspect "$image" >/dev/null
-else
-  docker login ghcr.io --username "$registry_user" --password-stdin
-  "${compose[@]}" pull
-fi
+docker login ghcr.io --username "$registry_user" --password-stdin
+"${compose[@]}" pull
 if [[ "$initialize_backups" == true ]]; then
   "${compose[@]}" run --rm --no-deps backup python -m app.backup init
 fi

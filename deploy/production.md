@@ -19,16 +19,15 @@
 Copy `.env.example` to `.env`. Set the R2 endpoint, bucket and credentials.
 For OVH transcription, set `ASR_PROVIDER=ovh` and `ASR_API_KEY`.
 Configure the separate private backup repository using [backups.md](backups.md).
-Then run:
+Production deployments run exclusively through the **Build, Test and Deploy**
+GitHub Actions workflow from `main`. The workflow builds the image in CI, pushes
+it to GHCR and uploads only Compose and deployment scripts to the VPS. Never
+copy the repository checkout/application sources to the VPS or build an image
+there.
 
-```bash
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml logs -f worker publisher backup
-```
-
-Use the same command after updates. Keep the project name `tuskometr` and its
-volumes when moving an existing production installation. The local project is
-`tuskometr-dev`; changing project names does not move existing data.
+Keep the project name `tuskometr` and its volumes when moving an existing
+production installation. The local project is `tuskometr-dev`; changing project
+names does not move existing data.
 If migrating from the old configuration, stop its `web` and `caddy` containers;
 the new production setup serves everything through Cloudflare.
 
@@ -46,14 +45,9 @@ docker compose --env-file .env --env-file .release.env \
   -f docker-compose.prod.yml exec -T worker python -m app.youtube_check
 ```
 
-For a release built directly on the VPS, place the committed checkout under
-`/opt/tuskometr/releases/COMMIT_SHA` and build `tuskometr:COMMIT_SHA` with the
-`runtime` Dockerfile target. From that release directory, run
-`bash scripts/deploy-production.sh tuskometr:COMMIT_SHA` as the deployment user
-with Docker access. This uses the same backup, migration, source and publication
-checks as GitHub Actions, without a registry login. The script records the image
-in `.release.env` and switches `current` after verification. Subsequent manual
-Compose commands must use both env files as shown above.
+The workflow records the deployed GHCR digest in `.release.env` and switches
+`current` after verification. Use both env files, as above, for diagnostic
+Compose commands. Deploy changes through GitHub Actions.
 
 The publisher uploads changed files, then switches the manifest. It removes
 unreferenced objects after 24 hours. Do not add bucket lifecycle expiration or
