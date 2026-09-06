@@ -36,6 +36,13 @@ const RANGE_OPTIONS = [
   { label: "30 dni", days: 30 },
 ] as const
 
+const SECTIONS = [
+  { id: "overview", label: "Podsumowanie" },
+  { id: "analysis", label: "Wykres" },
+  { id: "timeline", label: "Wzmianki" },
+  { id: "about-project", label: "O projekcie" },
+] as const
+
 const chartConfig = {
   count: { label: "Wystąpienia", color: "var(--primary)" },
 } satisfies ChartConfig
@@ -201,6 +208,37 @@ function TimelineItem({ item, timelineOrigin }: { item: Occurrence; timelineOrig
 }
 
 function App() {
+  const [activeSection, setActiveSection] = useState<string>("overview")
+  useEffect(() => {
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const threshold = window.innerHeight * 0.25
+      let active: string = SECTIONS[0].id
+      for (const section of SECTIONS) {
+        const element = document.getElementById(section.id)
+        if (element && element.getBoundingClientRect().top <= threshold) active = section.id
+      }
+      // The short footer cannot always reach the top quarter of the viewport.
+      if (window.scrollY > 0 && window.scrollY + window.innerHeight >=
+          document.documentElement.scrollHeight - 2) active = "about-project"
+      setActiveSection(active)
+    }
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(update)
+    }
+    window.addEventListener("scroll", schedule, { passive: true })
+    window.addEventListener("resize", schedule)
+    const observer = new ResizeObserver(schedule)
+    observer.observe(document.body)
+    schedule()
+    return () => {
+      window.removeEventListener("scroll", schedule)
+      window.removeEventListener("resize", schedule)
+      observer.disconnect()
+      window.cancelAnimationFrame(frame)
+    }
+  }, [])
   const [days, setDays] = useState(1)
   const [selectedBucket, setSelectedBucket] = useState<{
     start: string; end: string; label: string; dashboard: Dashboard
@@ -329,7 +367,7 @@ function App() {
         <div className="flex flex-wrap items-center justify-between gap-5 py-8 md:py-10">
           <div>
             <h1 className="font-display text-5xl font-semibold tracking-[-0.065em] sm:text-7xl">Tuskometr<span className="text-primary">.</span></h1>
-            <p className="mt-2 text-xs text-muted-foreground sm:text-sm">Wzmianki o Tusku w Telewizji Republika.</p>
+            <p className="mt-2 text-xs text-muted-foreground sm:text-sm">Wzmianki o Donaldzie Tusku w Republika TV</p>
           </div>
           {status?.state === "live" && (
             <span className="flex items-center gap-2.5 rounded-full border border-primary/15 bg-primary/5 px-3.5 py-2 text-[10px] font-semibold tracking-[0.12em] text-primary" aria-label="Na żywo">
@@ -342,10 +380,14 @@ function App() {
           )}
         </div>
         <nav aria-label="Sekcje strony" className="editorial-nav flex flex-wrap gap-x-6 gap-y-0 border-t border-t-foreground border-b border-b-slate-200 text-[11px] font-semibold sm:gap-x-8 sm:text-xs">
-          <a href="#overview" className="text-primary">Podsumowanie</a>
-          <a href="#analysis" className="hover:text-primary">Wykres</a>
-          <a href="#timeline" className="hover:text-primary">Wzmianki</a>
-          <a href="#about-project" className="hover:text-primary">O projekcie</a>
+          {SECTIONS.map((section) => (
+            <a key={section.id} href={`#${section.id}`}
+              className={activeSection === section.id ? "text-primary" : "hover:text-primary"}
+              aria-current={activeSection === section.id ? "location" : undefined}
+              onClick={() => setActiveSection(section.id)}>
+              {section.label}
+            </a>
+          ))}
         </nav>
       </header>
 
