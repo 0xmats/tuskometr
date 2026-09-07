@@ -104,7 +104,18 @@ export function dashboardIsStale(dashboard: Dashboard, manifest: Manifest, nowMs
 export async function fetchDashboard(url: string, signal?: AbortSignal): Promise<Dashboard> {
   const [path, fragment] = url.split("#")
   const dashboard = await request<Dashboard>(path, signal)
-  if (!dashboard.historyPages) return dashboard
+  if (!dashboard.historyPages) {
+    const offset = Number(fragment ?? 0)
+    if (!Number.isInteger(offset) || offset < 0 || offset > dashboard.occurrences.items.length) {
+      throw new Error("Nieprawidłowa strona historii")
+    }
+    const items = dashboard.occurrences.items.slice(offset, offset + 10)
+    return { ...dashboard, occurrences: {
+      items,
+      nextPage: offset + items.length < dashboard.occurrences.items.length
+        ? `${path}#${offset + items.length}` : dashboard.occurrences.nextPage,
+    } }
+  }
   const parts = (fragment ?? "0").split(":")
   let page = Number(parts[0])
   let offset = parts.length === 2 ? Number(parts[1]) : 0
@@ -113,11 +124,11 @@ export async function fetchDashboard(url: string, signal?: AbortSignal): Promise
     throw new Error("Nieprawidłowa strona historii")
   }
   const items: Occurrence[] = []
-  while (page <= dashboard.historyPages.length && items.length < 30) {
+  while (page <= dashboard.historyPages.length && items.length < 10) {
     const chunk = page === 0 ? dashboard.occurrences.items
       : (await request<{ items: Occurrence[] }>(dashboard.historyPages[page - 1], signal)).items
     if (offset > chunk.length) throw new Error("Nieprawidłowa strona historii")
-    const selected = chunk.slice(offset, offset + 30 - items.length)
+    const selected = chunk.slice(offset, offset + 10 - items.length)
     items.push(...selected)
     offset += selected.length
     if (offset === chunk.length) {
@@ -179,4 +190,45 @@ export async function fetchBucketOccurrences(
     const time = Date.parse(item.occurredAt)
     return time >= from && time < to
   }))
+}
+
+// Include the current partial day, matching the availability thresholds above.
+export function rangeLabel(days: number, stats: Stats | undefined, generatedAt?: string): string {
+  if (days === 0) return "1 godz."
+  if (days === 1) return "24 godz."
+  const age = Date.parse(generatedAt ?? "") - Date.parse(stats?.historyStartedAt ?? "")
+  const availableDays = Number.isFinite(age) ? Math.max(1, Math.ceil(age / 86_400_000)) : days
+  const count = Math.min(days, availableDays)
+  return `${count} ${count === 1 ? "dzień" : "dni"}`
+}
+
+export type BucketCursor = { page: number; offset: number }
+
+export async function fetchBucketOccurrencePage(
+  dashboard: Dashboard, start: string, end: string,
+  cursor: BucketCursor = { page: 0, offset: 0 }, signal?: AbortSignal,
+): Promise<{ items: Occurrence[]; nextCursor: BucketCursor | null }> {
+  const urls = dashboard.bucketPages?.[start]
+  if (!urls) {
+    // Older snapshots have no index; retain compatibility until they expire.
+    const all = await fetchBucketOccurrences(dashboard, start, end, signal)
+    const items = all.slice(cursor.offset, cursor.offset + 10)
+    const offset = cursor.offset + items.length
+    return { items, nextCursor: offset < all.length ? { page: 0, offset } : null }
+  }
+  const items: Occurrence[] = []
+  let { page, offset } = cursor
+  const from = Date.parse(start)
+  const to = Date.parse(end)
+  // Published chunks are ordered newest first. Fetch only enough for this page.
+  while (page < urls.length && items.length < 10) {
+    const chunk = await request<{ items: Occurrence[] }>(urls[page], signal)
+    while (offset < chunk.items.length && items.length < 10) {
+      const item = chunk.items[offset++]
+      const time = Date.parse(item.occurredAt)
+      if (time >= from && time < to) items.push(item)
+    }
+    if (offset === chunk.items.length) { page++; offset = 0 }
+  }
+  return { items, nextCursor: page < urls.length ? { page, offset } : null }
 }

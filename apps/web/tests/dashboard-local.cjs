@@ -27,8 +27,8 @@ async function main() {
         await page.locator('article').first().waitFor()
       }
       if (skew === 0) {
-        await page.getByRole('button', { name: 'Pokaż starsze' }).click()
-        await page.waitForFunction(() => document.querySelectorAll('article').length > 30)
+        await page.getByRole('button', { name: 'Pokaż kolejne 10' }).click()
+        await page.waitForFunction(() => document.querySelectorAll('article').length === 20)
         await page.waitForTimeout(35000)
         assert.ok(versions.size >= 2, 'must receive a new publication automatically')
       }

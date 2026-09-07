@@ -20,7 +20,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useYouTubeTimelineOrigin } from "@/hooks/use-youtube-timeline"
 import {
   fetchDashboard,
-  fetchBucketOccurrences,
+  fetchBucketOccurrencePage,
+  rangeLabel,
+  type BucketCursor,
   sortOccurrences,
   rangeAvailable,
   fetchManifest,
@@ -89,7 +91,7 @@ function formatBucket(value: string, days: number) {
     day: days > 1 ? "2-digit" : undefined,
     month: days > 1 ? "2-digit" : undefined,
     hour: days <= 1 ? "2-digit" : undefined,
-    minute: days === 0 ? "2-digit" : undefined,
+    minute: days <= 1 ? "2-digit" : undefined,
   }).format(new Date(value))
 }
 
@@ -256,11 +258,13 @@ function App() {
   const [selectedBucket, setSelectedBucket] = useState<{
     start: string; end: string; label: string; dashboard: Dashboard
   } | null>(null)
-  const bucketQuery = useQuery({
+  const bucketQuery = useInfiniteQuery({
     queryKey: ["bucket", selectedBucket?.start, selectedBucket?.end, selectedBucket?.dashboard.generatedAt],
-    queryFn: ({ signal }) => fetchBucketOccurrences(
-      selectedBucket!.dashboard, selectedBucket!.start, selectedBucket!.end, signal,
+    queryFn: ({ pageParam, signal }) => fetchBucketOccurrencePage(
+      selectedBucket!.dashboard, selectedBucket!.start, selectedBucket!.end, pageParam, signal,
     ),
+    initialPageParam: { page: 0, offset: 0 } as BucketCursor,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: selectedBucket !== null,
     staleTime: Infinity,
     gcTime: 60_000,
@@ -308,8 +312,9 @@ function App() {
     dashboardIsStale(dashboard, manifest, now)
   const dataIsStale = refreshFailed || snapshotExpired
   const status = dataIsStale ? undefined : dashboard?.status
-  const occurrences = selectedBucket ? (bucketQuery.data ?? [])
+  const occurrences = selectedBucket ? (bucketQuery.data?.pages.flatMap((page) => page.items) ?? [])
     : sortOccurrences(pages.flatMap((page) => page.occurrences.items))
+  const listQuery = selectedBucket ? bucketQuery : occurrencesQuery
   const listLoading = selectedBucket ? bucketQuery.isPending : statsQuery.isLoading
   const timelineRef = useRef<HTMLDivElement>(null)
   const previousTimeline = useRef<{ days: number; ids: Set<number>; newest: number } | null>(null)
@@ -340,7 +345,8 @@ function App() {
     return () => animations.forEach((animation) => animation.cancel())
   }, [days, occurrencesQuery.data, occurrencesQuery.isPlaceholderData, selectedBucket])
   const chartData =
-    statsQuery.data?.buckets.map((item) => ({
+    statsQuery.data?.buckets.filter((item) => days <= 1 || !statsQuery.data?.historyStartedAt ||
+      Date.parse(item.end) > Date.parse(statsQuery.data.historyStartedAt)).map((item) => ({
       start: item.start,
       end: item.end,
       label: formatBucket(item.start, days),
@@ -455,7 +461,7 @@ function App() {
                       aria-pressed={days === option.days}
                       onClick={() => { setDays(option.days); setSelectedBucket(null) }}
                     >
-                      {option.label}
+                      {rangeLabel(option.days, dashboard?.stats, dashboard?.generatedAt)}
                     </Button>
                   ))}
                 </div>
@@ -542,7 +548,7 @@ function App() {
                 <div className="space-y-4 py-5">
                   {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 w-full" />)}
                 </div>
-              ) : selectedBucket && bucketQuery.isError ? (
+              ) : selectedBucket && bucketQuery.isError && !occurrences.length ? (
                 <div role="alert" className="py-8 text-center">
                   <p>Nie udało się pobrać wzmianek z wybranego przedziału.</p>
                   <Button variant="outline" className="mt-3" onClick={() => bucketQuery.refetch()}>Spróbuj ponownie</Button>
@@ -552,15 +558,15 @@ function App() {
                   <div ref={timelineRef}>
                     {occurrences.map((item) => <TimelineItem key={item.id} item={item} timeline={timeline} />)}
                   </div>
-                  {!selectedBucket && occurrencesQuery.hasNextPage && (
+                  {listQuery.hasNextPage && (
                     <div className="flex justify-center pt-5">
                       <Button
                         variant="outline"
-                        onClick={() => occurrencesQuery.fetchNextPage()}
-                        disabled={occurrencesQuery.isFetchingNextPage || occurrencesQuery.isPlaceholderData}
+                        onClick={() => listQuery.fetchNextPage()}
+                        disabled={listQuery.isFetchingNextPage || (!selectedBucket && occurrencesQuery.isPlaceholderData)}
                       >
-                        {occurrencesQuery.isFetchingNextPage ? <RefreshCw className="size-4 animate-spin" /> : <ArrowUpRight className="size-4" />}
-                        Pokaż starsze
+                        {listQuery.isFetchingNextPage ? <RefreshCw className="size-4 animate-spin" /> : <ArrowUpRight className="size-4" />}
+                        {listQuery.isFetchNextPageError ? "Spróbuj ponownie" : "Pokaż kolejne 10"}
                       </Button>
                     </div>
                   )}

@@ -79,12 +79,60 @@ for (const sizes of [[1, 30, 30, 4], Array(65).fill(1), [30, 30, 5], [0, 0, 30, 
   let next = base
   while (next) {
     const page = await api.fetchDashboard(next)
-    assert.ok(page.occurrences.items.length <= 30)
-    if (page.occurrences.nextPage) assert.equal(page.occurrences.items.length, 30)
+    assert.ok(page.occurrences.items.length <= 10)
+    if (page.occurrences.nextPage) assert.equal(page.occurrences.items.length, 10)
     collected.push(...page.occurrences.items)
     next = page.occurrences.nextPage
   }
   assert.deepEqual(collected, chunks.flat())
   await assert.rejects(api.fetchDashboard(`${base}#1:999`), /Nieprawidłowa/)
 }
-console.log('30-item pages across storage boundaries without skipped or duplicated mentions passed')
+console.log('10-item pages across storage boundaries without skipped or duplicated mentions passed')
+
+for (const [age, weekly, monthly] of [[2, '2 dni', '2 dni'], [3, '3 dni', '3 dni'],
+  [7, '7 dni', '7 dni'], [7.1, '7 dni', '8 dni'], [9, '7 dni', '9 dni'],
+  [30, '7 dni', '30 dni'], [40, '7 dni', '30 dni']]) {
+  const stats = { historyStartedAt: '2026-01-01T00:00:00Z' }
+  const now = new Date(Date.parse(stats.historyStartedAt) + age * 86400000).toISOString()
+  assert.equal(api.rangeLabel(7, stats, now), weekly)
+  assert.equal(api.rangeLabel(30, stats, now), monthly)
+}
+// A selected day must not download every storage chunk before showing ten rows.
+for (const sizes of [[30, 30, 5], [1, 2, 4, 30], [10, 10], [0]]) {
+  let id = 1000
+  const chunks = sizes.map(size => Array.from({ length: size }, () => at(id--, '12:30')))
+  const urls = chunks.map((_, i) => `/dashboard/bucket-${i}.json`)
+  const requested = []
+  globalThis.fetch = async url => {
+    requested.push(url)
+    return new Response(JSON.stringify({ items: chunks[Number(url.match(/bucket-(\d+)/)[1])] }))
+  }
+  const snapshot = { ...dashboard, bucketPages: { [start]: urls } }
+  const first = await api.fetchBucketOccurrencePage(snapshot, start, end)
+  assert.deepEqual(first.items, chunks.flat().slice(0, 10))
+  if (sizes[0] >= 10) assert.equal(requested.length, 1)
+  const collected = [...first.items]
+  let next = first.nextCursor
+  while (next) {
+    const page = await api.fetchBucketOccurrencePage(snapshot, start, end, next)
+    assert.ok(page.items.length <= 10)
+    collected.push(...page.items)
+    next = page.nextCursor
+  }
+  assert.deepEqual(collected, chunks.flat())
+}
+// Static (non-R2) pages also expose ten rows without losing the rest of a chunk.
+const legacyRows = Array.from({ length: 35 }, (_, id) => at(id, '12:30'))
+globalThis.fetch = async url => new Response(JSON.stringify({ ...dashboard, historyPages: undefined,
+  occurrences: { items: url.endsWith('older.json') ? legacyRows.slice(30) : legacyRows.slice(0, 30),
+    nextPage: url.endsWith('older.json') ? null : '/dashboard/older.json' } }))
+let legacyNext = base
+const legacyCollected = []
+while (legacyNext) {
+  const page = await api.fetchDashboard(legacyNext)
+  assert.ok(page.occurrences.items.length <= 10)
+  legacyCollected.push(...page.occurrences.items)
+  legacyNext = page.occurrences.nextPage
+}
+assert.deepEqual(legacyCollected, legacyRows)
+console.log('Dynamic range labels and lazy ten-item bucket/static pagination passed')
