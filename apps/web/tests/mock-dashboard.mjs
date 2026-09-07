@@ -39,6 +39,23 @@ for (const days of [0, 1, 7, 30]) {
   assert.equal(new Set(items.map(item => item.id)).size, expected)
   assert.equal(dashboard.stats.range.total, expected)
   assert.equal(dashboard.stats.forms.reduce((sum, form) => sum + form.count, 0), expected)
+  const record = dashboard.stats.hourlyRecord
+  assert.ok(record.count >= dashboard.stats.summary.lastHour)
+  assert.equal(Date.parse(record.end) - Date.parse(record.start), 3_600_000)
+  const expectedRecord = fixture.occurrences.filter(item => {
+    const at = now - item.minutesAgo * 60_000
+    return at >= Date.parse(record.start) && at <= Date.parse(record.end)
+  })
+  const recordItems = []
+  let recordCursor
+  do {
+    const page = await api.fetchRecordOccurrencePage(dashboard, recordCursor)
+    recordItems.push(...page.items)
+    recordCursor = page.nextCursor
+  } while (recordCursor)
+  assert.equal(recordItems.length, record.count)
+  assert.deepEqual(recordItems.map(item => item.id).sort((a, b) => a - b),
+    expectedRecord.map(item => item.id).sort((a, b) => a - b))
   let bucketTotal = 0
   for (const bucket of dashboard.stats.buckets) {
     const rows = await api.fetchBucketOccurrences(dashboard, bucket.start, bucket.end)

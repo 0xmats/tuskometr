@@ -14,6 +14,23 @@ history; the 30-day range appears after more than 7 days. Publishers include sta
 not query the production database. Deploy both publisher and frontend for these
 features; no database migration is needed.
 
+The hourly record compares the current last-hour count with the largest count in
+any consecutive 60 minutes across all stored mentions, including history older
+than 30 days. Windows include both endpoints, matching the live counter; they end
+at a mention timestamp, and the earliest ending window wins ties. A window can
+begin before the first collected sample; missing coverage is not inferred. The
+page shows the earliest available data timestamp and explains that collection
+gaps can affect the observed record. All displayed dates use Europe/Warsaw.
+
+Clicking the record opens its mentions newest first, ten at a time, with a return
+to live action. Publishers create separate record pages shared by all chart ranges;
+R2 reuses unchanged record objects and keeps them active regardless of their age.
+The browser fetches those pages only on selection. Record calculation streams
+indexed timestamps from the full history in one pass and loads quotes only for
+the winning hour and the normal 30-day chart range. Backfills and corrections to
+an old record trigger publication too. No detection or database schema changes
+are needed; deploy both publisher and frontend to enable the feature.
+
 The publisher checks for changes every five seconds (`DASHBOARD_REFRESH_SECONDS=5`),
 and the frontend checks the manifest every five seconds. New mentions, historical
 inserts, edits, deletions and pipeline state/model/reconnect-count changes trigger

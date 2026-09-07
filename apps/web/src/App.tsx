@@ -9,6 +9,7 @@ import {
   Radio,
   RefreshCw,
   SearchX,
+  Trophy,
 } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis, usePlotArea } from "recharts"
 
@@ -21,6 +22,7 @@ import { useYouTubeTimelineOrigin } from "@/hooks/use-youtube-timeline"
 import {
   fetchDashboard,
   fetchBucketOccurrencePage,
+  fetchRecordOccurrencePage,
   rangeLabel,
   type BucketCursor,
   sortOccurrences,
@@ -83,6 +85,12 @@ function formatDate(value: string) {
     month: "long",
     year: "numeric",
   }).format(new Date(value))
+}
+
+function formatInterval(start: string, end: string) {
+  return `${formatDate(start)}, ${formatTime(start)} – ${
+    formatDate(start) === formatDate(end) ? "" : `${formatDate(end)}, `
+  }${formatTime(end)}`
 }
 
 function formatBucket(value: string, days: number) {
@@ -256,11 +264,13 @@ function App() {
   }, [])
   const [days, setDays] = useState(1)
   const [selectedBucket, setSelectedBucket] = useState<{
-    start: string; end: string; label: string; dashboard: Dashboard
+    start: string; end: string; label: string; dashboard: Dashboard; kind?: "record"
   } | null>(null)
   const bucketQuery = useInfiniteQuery({
-    queryKey: ["bucket", selectedBucket?.start, selectedBucket?.end, selectedBucket?.dashboard.generatedAt],
-    queryFn: ({ pageParam, signal }) => fetchBucketOccurrencePage(
+    queryKey: ["bucket", selectedBucket?.kind, selectedBucket?.start, selectedBucket?.end, selectedBucket?.dashboard.generatedAt],
+    queryFn: ({ pageParam, signal }) => selectedBucket?.kind === "record"
+      ? fetchRecordOccurrencePage(selectedBucket.dashboard, pageParam, signal)
+      : fetchBucketOccurrencePage(
       selectedBucket!.dashboard, selectedBucket!.start, selectedBucket!.end, pageParam, signal,
     ),
     initialPageParam: { page: 0, offset: 0 } as BucketCursor,
@@ -303,6 +313,11 @@ function App() {
   }, [occurrencesQuery.data, occurrencesQuery.isPlaceholderData])
   const pages = occurrencesQuery.data?.pages ?? lastGoodPages.current
   const dashboard = pages[0]
+  const liveStats = dashboard?.stats
+  const hourlyRecord = liveStats?.hourlyRecord
+  const recordPercentage = hourlyRecord && hourlyRecord.count > 0 && liveStats?.summary.lastHour !== undefined
+    ? (100 * liveStats.summary.lastHour / hourlyRecord.count).toLocaleString("pl-PL", { maximumFractionDigits: 1 })
+    : null
   const statsQuery = {
     ...occurrencesQuery, data: selectedBucket?.dashboard.stats ?? dashboard?.stats,
     isLoading: !dashboard && (manifestQuery.isPending || occurrencesQuery.isPending),
@@ -377,6 +392,17 @@ function App() {
     setDays(1)
   }
 
+  function selectRecord() {
+    if (!dashboard || !hourlyRecord || !dashboard.recordPages?.length || occurrencesQuery.isPlaceholderData) return
+    setSelectedBucket({
+      start: hourlyRecord.start, end: hourlyRecord.end, kind: "record", dashboard,
+      label: `Rekord: ${hourlyRecord.count.toLocaleString("pl-PL")} wzmianek · ${formatInterval(hourlyRecord.start, hourlyRecord.end)}`,
+    })
+    document.getElementById("timeline")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    })
+  }
 
   return (
     <div className="min-h-screen">
@@ -430,17 +456,40 @@ function App() {
             <p className="text-xs font-medium">Tusków na godzinę</p>
             <div className="my-2 flex items-baseline gap-2">
               <span className="font-display text-6xl font-semibold tracking-[-0.05em] tabular-nums">
-                {statsQuery.data?.summary.lastHour?.toLocaleString("pl-PL") ?? "—"}
+                {liveStats?.summary.lastHour?.toLocaleString("pl-PL") ?? "—"}
               </span>
               <span className="text-sm text-white/85">/ godz.</span>
             </div>
-            <p className="text-xs text-white/90">{hourlyFrequencyLabel(statsQuery.data?.summary.lastHour)}</p>
+            <p className="text-xs text-white/90">{hourlyFrequencyLabel(liveStats?.summary.lastHour)}</p>
           </div>
-          <StatCard label="Dzisiaj" value={statsQuery.data?.summary.today} detail="wystąpień nazwiska Tusk" icon={Clock3} />
-          <StatCard label="Ostatnie 24 godziny" value={statsQuery.data?.summary.last24Hours} detail="wystąpień nazwiska Tusk" icon={Activity} />
-          {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`} value={statsQuery.data?.summary.last7Days} detail="wystąpień nazwiska Tusk" icon={BarChart3} />}
+          <StatCard label="Dzisiaj" value={liveStats?.summary.today} detail="wystąpień nazwiska Tusk" icon={Clock3} />
+          <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours} detail="wystąpień nazwiska Tusk" icon={Activity} />
+          {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`} value={liveStats?.summary.last7Days} detail="wystąpień nazwiska Tusk" icon={BarChart3} />}
 
         </section>
+
+        {hourlyRecord && (
+          <button type="button" onClick={selectRecord}
+            disabled={!dashboard.recordPages?.length || occurrencesQuery.isPlaceholderData}
+            aria-label={`Pokaż wszystkie fragmenty rekordu: ${hourlyRecord.count} wzmianek w 60 minut`}
+            className="mt-3 flex w-full flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-primary/15 bg-primary/5 px-5 py-4 text-left transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60 md:px-7">
+            <Trophy className="size-5 shrink-0 text-primary" aria-hidden="true" />
+            <span className="min-w-0 flex-1 basis-56">
+              <span className="block text-sm font-semibold">Rekord: {hourlyRecord.count.toLocaleString("pl-PL")} Tusków / godz.</span>
+              <span className="mt-1 block text-xs text-muted-foreground">{formatInterval(hourlyRecord.start, hourlyRecord.end)}</span>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {recordPercentage !== null && <span className="mb-1 block">Obecne tempo: <strong className="font-semibold text-foreground">{recordPercentage}% rekordu</strong></span>}
+              <span className="inline-flex items-center gap-1 font-medium text-primary">Zobacz fragmenty <ArrowUpRight className="size-4" aria-hidden="true" /></span>
+            </span>
+          </button>
+        )}
+        {liveStats?.historyStartedAt && (
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            Zbieramy dane od {formatDate(liveStats.historyStartedAt)}, {formatTime(liveStats.historyStartedAt)} (czas polski).
+            {" "}Rekord dotyczy dowolnych kolejnych 60 minut w zebranych danych. Przerwy w zbieraniu mogą wpływać na wynik.
+          </p>
+        )}
 
         <section id="analysis" className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.65fr)]">
           <Card>
@@ -486,7 +535,7 @@ function App() {
                     <Bar dataKey="count" fill="var(--color-count)" radius={[3, 3, 0, 0]} maxBarSize={34}
                       cursor="pointer" onClick={(entry) => selectBucket(entry.payload)}>
                       {chartData.map((item) => <Cell key={item.start}
-                        fillOpacity={!selectedBucket || selectedBucket.start === item.start ? 1 : 0.35} />)}
+                        fillOpacity={!selectedBucket || selectedBucket.kind === "record" || selectedBucket.start === item.start ? 1 : 0.35} />)}
                     </Bar>
                     <ChartBands buckets={chartData} onSelect={selectBucket} />
                   </BarChart>
@@ -560,6 +609,11 @@ function App() {
                   <div ref={timelineRef}>
                     {occurrences.map((item) => <TimelineItem key={item.id} item={item} timeline={timeline} />)}
                   </div>
+                  {selectedBucket?.kind === "record" && (
+                    <p className="pt-4 text-center text-xs text-muted-foreground" aria-live="polite">
+                      Pokazano {occurrences.length} z {selectedBucket.dashboard.stats.hourlyRecord?.count} fragmentów rekordu
+                    </p>
+                  )}
                   {listQuery.hasNextPage && (
                     <div className="flex justify-center pt-5">
                       <Button

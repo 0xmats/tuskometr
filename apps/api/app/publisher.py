@@ -36,6 +36,9 @@ def publication_signature(snapshot: Snapshot) -> bytes:
             for item in snapshot.occurrences[longest_range]
         ],
         "historyStartedAt": json.loads(snapshot.stats[longest_range])["historyStartedAt"],
+        "hourlyRecord": json.loads(snapshot.stats[longest_range]).get("hourlyRecord"),
+        "recordItems": [item.model_dump(mode="json", by_alias=True)
+                        for item in snapshot.record_items],
         "status": {key: status[key] for key in ("state", "modelName", "reconnectCount")},
     }
     return hashlib.sha256(
@@ -105,8 +108,17 @@ def publish(snapshot: Snapshot, root: Path, stale_seconds: float = 120) -> dict:
         "dashboards": {},
     }
     try:
+        record_pages = []
+        for offset in range(0, len(snapshot.record_items), PAGE_SIZE):
+            name = f"record-{offset // PAGE_SIZE}.json"
+            write_json(staging / name, {"items": [
+                item.model_dump(mode="json", by_alias=True)
+                for item in snapshot.record_items[offset:offset + PAGE_SIZE]
+            ]})
+            record_pages.append(f"/dashboard/versions/{version}/{name}")
         for days, items in snapshot.occurrences.items():
             base = json.loads(snapshot.dashboards[days])
+            base["recordPages"] = record_pages
             pages = max(1, (len(items) + PAGE_SIZE - 1) // PAGE_SIZE)
             prefix = f"/dashboard/versions/{version}/{days}"
             manifest["dashboards"][str(days)] = f"{prefix}-0.json"

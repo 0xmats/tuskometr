@@ -77,10 +77,10 @@ def test_history_is_stable_on_insert_and_old_snapshot_remains_readable(database,
     first = publisher.publish(snapshot)
     old = json.loads(store.objects[first["dashboards"]["7"].lstrip("/")]["Body"])
     old_history = old["historyPages"]
-    # The same history objects are shared across ranges.
+    # History objects are shared across ranges; the fixture's record adds one object.
     assert (
         len({key for key in store.writes if key.startswith("dashboard/objects/")})
-        == len(RANGES) + 5
+        == len(RANGES) + 6
     )
     store.writes.clear()
     added = items[0].model_copy(update={"id": 121})

@@ -32,6 +32,25 @@ export function buildMockDashboard(fixture: Fixture, now = Date.now()) {
     last24Hours: within(day).length,
     last7Days: within(7 * day).length,
   }
+  const ascending = [...all].reverse().filter(item => Date.parse(item.occurredAt) <= now)
+  let hourlyRecord: { count: number; start: string; end: string } | null = null
+  let left = 0
+  for (let right = 0; right < ascending.length; right++) {
+    const end = Date.parse(ascending[right].occurredAt)
+    while (Date.parse(ascending[left].occurredAt) < end - 3_600_000) left++
+    const count = right - left + 1
+    if (!hourlyRecord || count > hourlyRecord.count) {
+      hourlyRecord = { count, start: iso(end - 3_600_000), end: iso(end) }
+    }
+  }
+  const recordItems = all.filter(item => hourlyRecord &&
+    item.occurredAt >= hourlyRecord.start && item.occurredAt <= hourlyRecord.end)
+  const recordPages = []
+  for (let offset = 0; offset < recordItems.length; offset += 30) {
+    const url = `${prefix}/record-${offset}.json`
+    routes.set(url, { items: recordItems.slice(offset, offset + 30) })
+    recordPages.push(url)
+  }
   const dashboards: Record<string, string> = {}
   for (const days of [0, 1, 7, 30]) {
     const duration = days === 0 ? 3_600_000 : days * day
@@ -60,9 +79,9 @@ export function buildMockDashboard(fixture: Fixture, now = Date.now()) {
     const url = `${prefix}/${days}.json`
     dashboards[String(days)] = url
     routes.set(url, {
-      generatedAt, historyPages, bucketPages,
+      generatedAt, historyPages, bucketPages, recordPages,
       stats: {
-        historyStartedAt: iso(now - fixture.historyDays * day), summary,
+        historyStartedAt: iso(now - fixture.historyDays * day), summary, hourlyRecord,
         range: { from: iso(now - duration), to: generatedAt, total: selected.length },
         buckets, forms: [...forms].map(([form, count]) => ({ form, count })),
       },

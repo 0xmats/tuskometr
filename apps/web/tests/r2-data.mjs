@@ -136,3 +136,38 @@ while (legacyNext) {
 }
 assert.deepEqual(legacyCollected, legacyRows)
 console.log('Dynamic range labels and lazy ten-item bucket/static pagination passed')
+
+// Record pages are independent of the chart horizon and include both endpoints.
+const recordRows = Array.from({ length: 65 }, (_, i) => ({
+  id: 1000 - i, occurredAt: new Date(Date.parse(end) - i * 60_000).toISOString(),
+})).filter(item => Date.parse(item.occurredAt) >= Date.parse(start))
+const recordChunks = [recordRows.slice(0, 30), recordRows.slice(30, 60), recordRows.slice(60)]
+const recordUrls = recordChunks.map((_, i) => `/dashboard/record-${i}.json`)
+const recordDashboard = { ...dashboard, stats: { hourlyRecord: {
+  count: recordRows.length, start, end,
+} }, recordPages: recordUrls }
+const recordRequests = []
+globalThis.fetch = async url => {
+  recordRequests.push(url)
+  const index = recordUrls.findIndex(path => url.endsWith(path))
+  assert.ok(index >= 0, 'record view must not fetch chart or unrelated history pages')
+  return new Response(JSON.stringify({ items: recordChunks[index] }))
+}
+const recordFirst = await api.fetchRecordOccurrencePage(recordDashboard)
+assert.equal(recordRequests.length, 1)
+assert.equal(recordFirst.items.length, 10)
+const recordCollected = [...recordFirst.items]
+let recordCursor = recordFirst.nextCursor
+while (recordCursor) {
+  const page = await api.fetchRecordOccurrencePage(recordDashboard, recordCursor)
+  assert.ok(page.items.length <= 10)
+  recordCollected.push(...page.items)
+  recordCursor = page.nextCursor
+}
+assert.deepEqual(recordCollected, recordRows)
+assert.equal(Date.parse(recordCollected[0].occurredAt), Date.parse(end))
+assert.equal(Date.parse(recordCollected.at(-1).occurredAt), Date.parse(start))
+await assert.rejects(api.fetchRecordOccurrencePage(dashboard), /Brak fragmentów/)
+globalThis.fetch = async () => new Response('', { status: 503 })
+await assert.rejects(api.fetchRecordOccurrencePage(recordDashboard), /503/)
+console.log('Record pagination: all fragments, inclusive endpoints, lazy reads and errors passed')

@@ -15,6 +15,7 @@ export type OccurrencePage = {
 
 export type Stats = {
   historyStartedAt?: string | null
+  hourlyRecord?: { count: number; start: string; end: string } | null
   summary: {
     lastHour?: number
     today: number
@@ -57,6 +58,7 @@ async function request<T>(url: string, signal?: AbortSignal): Promise<T> {
 }
 
 export type Dashboard = {
+  recordPages?: string[]
   historyPages?: string[]
   bucketPages?: Record<string, string[]>
   generatedAt: string
@@ -216,6 +218,23 @@ export async function fetchBucketOccurrencePage(
     const offset = cursor.offset + items.length
     return { items, nextCursor: offset < all.length ? { page: 0, offset } : null }
   }
+  return fetchIndexedOccurrencePage(urls, start, end, cursor, signal)
+}
+
+export async function fetchRecordOccurrencePage(
+  dashboard: Dashboard, cursor: BucketCursor = { page: 0, offset: 0 }, signal?: AbortSignal,
+): Promise<{ items: Occurrence[]; nextCursor: BucketCursor | null }> {
+  const record = dashboard.stats.hourlyRecord
+  if (!record || !dashboard.recordPages?.length) throw new Error("Brak fragmentów rekordu")
+  return fetchIndexedOccurrencePage(
+    dashboard.recordPages, record.start, record.end, cursor, signal, true,
+  )
+}
+
+async function fetchIndexedOccurrencePage(
+  urls: string[], start: string, end: string, cursor: BucketCursor,
+  signal?: AbortSignal, inclusiveEnd = false,
+): Promise<{ items: Occurrence[]; nextCursor: BucketCursor | null }> {
   const items: Occurrence[] = []
   let { page, offset } = cursor
   const from = Date.parse(start)
@@ -226,7 +245,7 @@ export async function fetchBucketOccurrencePage(
     while (offset < chunk.items.length && items.length < 10) {
       const item = chunk.items[offset++]
       const time = Date.parse(item.occurredAt)
-      if (time >= from && time < to) items.push(item)
+      if (time >= from && (inclusiveEnd ? time <= to : time < to)) items.push(item)
     }
     if (offset === chunk.items.length) { page++; offset = 0 }
   }

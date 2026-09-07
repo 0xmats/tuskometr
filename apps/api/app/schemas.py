@@ -50,10 +50,17 @@ class FormCount(ApiModel):
     count: int
 
 
+class HourlyRecord(ApiModel):
+    count: int
+    start: datetime
+    end: datetime
+
+
 class StatsResponse(ApiModel):
     history_started_at: datetime | None = Field(
         default=None, serialization_alias="historyStartedAt"
     )
+    hourly_record: HourlyRecord | None = Field(default=None, serialization_alias="hourlyRecord")
     summary: StatSummary
     range: StatRange
     buckets: list[StatBucket]

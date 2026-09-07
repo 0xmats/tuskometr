@@ -84,7 +84,7 @@ def read_url(root, url):
 def test_publication_and_reads_without_database(database, tmp_path):
     factory, reads = database
     snapshot = build_snapshot(Settings(_env_file=None), factory)
-    assert len(reads) == 4
+    assert len(reads) == 7  # One read transaction, history/record, chart rows and status.
     manifest = publish(snapshot, tmp_path)
     reads.clear()
     for _ in range(100):

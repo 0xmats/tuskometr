@@ -73,6 +73,10 @@ class R2Publisher:
                 self.db.commit()
             return "/" + key
 
+        record_pages = [
+            immutable({"items": [item.model_dump(mode="json", by_alias=True) for item in group]})
+            for _, group in groupby(snapshot.record_items, lambda item: item.id // PAGE_SIZE)
+        ]
         dashboards = {}
         for days, items in snapshot.occurrences.items():
             # Preserve time order, grouping contiguous IDs to reuse unchanged objects.
@@ -84,6 +88,7 @@ class R2Publisher:
                 for group in groups[1:]
             ]
             payload = json.loads(snapshot.dashboards[days])
+            payload["recordPages"] = record_pages
             payload["occurrences"] = {
                 "items": [item.model_dump(mode="json", by_alias=True) for item in groups[0]]
                 if groups else [],

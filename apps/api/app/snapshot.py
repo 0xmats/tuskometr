@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 from bisect import bisect_right
-from collections import Counter
-from collections.abc import Mapping
+from collections import Counter, deque
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
@@ -17,6 +17,7 @@ from .models import Occurrence, PipelineState, SourceSession, TranscriptSegment
 from .schemas import (
     DashboardResponse,
     FormCount,
+    HourlyRecord,
     OccurrenceDto,
     OccurrencePage,
     StatBucket,
@@ -38,6 +39,41 @@ def aware(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
+def find_hourly_record(timestamps: Iterable[datetime]) -> HourlyRecord | None:
+    """Sorted source times; closed 60-minute windows match the live counter.
+
+    Each window ends at an observed mention, never in the future. Earliest end
+    wins ties. Only one hour of timestamps is held in memory, without quotes.
+    """
+    window: deque[datetime] = deque()
+    best = None
+    hour = timedelta(hours=1)
+    for value in timestamps:
+        end = aware(value)
+        start = end - hour
+        while window and window[0] < start:
+            window.popleft()
+        window.append(end)
+        if best is None or len(window) > best.count:
+            best = HourlyRecord(count=len(window), start=start, end=end)
+    return best
+
+
+def occurrence_rows():
+    return select(
+        Occurrence.id, Occurrence.occurred_at, Occurrence.form, Occurrence.quote,
+        Occurrence.confidence, Occurrence.source_position_seconds, SourceSession.source_url,
+    ).join(SourceSession, Occurrence.source_session_id == SourceSession.id)
+
+
+def occurrence_dto(row) -> OccurrenceDto:
+    return OccurrenceDto(
+        id=row.id, occurred_at=aware(row.occurred_at), form=row.form, quote=row.quote,
+        confidence=row.confidence, source_url=row.source_url,
+        source_position_seconds=row.source_position_seconds,
+    )
+
+
 @dataclass(frozen=True)
 class Snapshot:
     generated_at: datetime
@@ -46,6 +82,7 @@ class Snapshot:
     status: bytes
     occurrences: Mapping[int, tuple[OccurrenceDto, ...]]
     positions: Mapping[int, Mapping[int, int]]
+    record_items: tuple[OccurrenceDto, ...] = ()
 
     def page(self, days: int, cursor: int | None = None) -> OccurrencePage:
         rows = self.occurrences[days]
@@ -76,40 +113,36 @@ def build_snapshot(
     zone = ZoneInfo(settings.app_timezone)
     # Read history age separately; chart rows cover only the last 30 days.
     with factory() as db:
+        if db.bind.dialect.name == "sqlite":
+            # Pin a read snapshot so concurrent backfills cannot change the
+            # winning count between the timestamp scan and loading its quotes.
+            db.connection().exec_driver_sql("BEGIN")
         history_dates = [
             db.scalar(select(func.min(Occurrence.occurred_at))),
             db.scalar(select(func.min(TranscriptSegment.started_at))),
         ]
         history_started_at = min((value for value in history_dates if value), default=None)
+        record = find_hourly_record(db.scalars(
+            select(Occurrence.occurred_at)
+            .where(Occurrence.occurred_at <= now)
+            .order_by(Occurrence.occurred_at)
+            .execution_options(yield_per=1000)
+        ))
+        record_items = tuple(occurrence_dto(row) for row in db.execute(
+            occurrence_rows().where(
+                Occurrence.occurred_at >= record.start,
+                Occurrence.occurred_at <= record.end,
+            ).order_by(Occurrence.occurred_at.desc(), Occurrence.id.desc())
+        )) if record else ()
         rows = db.execute(
-            select(
-                Occurrence.id,
-                Occurrence.occurred_at,
-                Occurrence.form,
-                Occurrence.quote,
-                Occurrence.confidence,
-                Occurrence.source_position_seconds,
-                SourceSession.source_url,
-            )
-            .join(SourceSession, Occurrence.source_session_id == SourceSession.id)
+            occurrence_rows()
             .where(
                 Occurrence.occurred_at >= now - timedelta(days=30),
                 Occurrence.occurred_at <= now,
             )
             .order_by(Occurrence.occurred_at.desc(), Occurrence.id.desc())
         ).all()
-        items = tuple(
-            OccurrenceDto(
-                id=row.id,
-                occurred_at=aware(row.occurred_at),
-                form=row.form,
-                quote=row.quote,
-                confidence=row.confidence,
-                source_url=row.source_url,
-                source_position_seconds=row.source_position_seconds,
-            )
-            for row in rows
-        )
+        items = tuple(occurrence_dto(row) for row in rows)
         state = db.get(PipelineState, 1)
         status = StatusResponse(
             state=state.state if state else "offline",
@@ -152,6 +185,7 @@ def build_snapshot(
                 for days, selected in occurrences.items()
             }
         ),
+        record_items=record_items,
     )
     for days, selected in occurrences.items():
         # UTC keys distinguish repeated hours at the autumn DST transition.
@@ -172,6 +206,7 @@ def build_snapshot(
             buckets[floor.astimezone(UTC)] += 1
         response = StatsResponse(
             history_started_at=aware(history_started_at) if history_started_at else None,
+            hourly_record=record,
             summary=summary,
             range=StatRange(from_=now - range_duration(days), to=now, total=len(selected)),
             buckets=[
