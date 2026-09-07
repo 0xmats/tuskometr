@@ -349,7 +349,6 @@ function App() {
       Date.parse(item.end) > Date.parse(statsQuery.data.historyStartedAt)).map((item) => ({
       start: item.start,
       end: item.end,
-      label: formatBucket(item.start, days),
       count: item.count,
     })) ?? []
 
@@ -478,9 +477,12 @@ function App() {
                 <ChartContainer config={chartConfig} className="occurrence-chart h-[280px] w-full overflow-hidden">
                   <BarChart data={chartData} margin={{ left: -24, right: 8, top: 12 }}>
                     <CartesianGrid vertical={false} stroke="#e8ebee" strokeDasharray="3 3" />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={12} minTickGap={24} />
+                    <XAxis dataKey="start" tickFormatter={(value: string) => formatBucket(value, days)} tickLine={false} axisLine={false} tickMargin={12} minTickGap={24} />
                     <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                    <ChartTooltip cursor={{ fill: "rgba(0,0,0,.04)" }} content={<ChartTooltipContent />} />
+                    <ChartTooltip cursor={{ fill: "rgba(0,0,0,.04)" }} content={(props) => <ChartTooltipContent active={props.active} payload={props.payload}
+                      label={typeof props.label === "string"
+                        ? `${formatDate(props.label)}${days <= 1 ? `, ${formatBucket(props.label, days)}` : ""}`
+                        : props.label} />} />
                     <Bar dataKey="count" fill="var(--color-count)" radius={[3, 3, 0, 0]} maxBarSize={34}
                       cursor="pointer" onClick={(entry) => selectBucket(entry.payload)}>
                       {chartData.map((item) => <Cell key={item.start}
