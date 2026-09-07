@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import logging
 import os
@@ -13,13 +14,64 @@ import tempfile
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .monitoring import Heartbeat
 from .snapshot import PAGE_SIZE, Snapshot, build_snapshot
 
 logger = logging.getLogger("tuskometr.publisher")
+
+
+def publication_signature(snapshot: Snapshot) -> bytes:
+    """Ignore clock/heartbeat churn, but include every retained public mention."""
+    longest_range = max(snapshot.occurrences)
+    status = json.loads(snapshot.status)
+    payload = {
+        # Comparing the full public rows detects backfills, edits and deletions,
+        # including changes outside the first page and the selected UI range.
+        "occurrences": [
+            item.model_dump(mode="json", by_alias=True)
+            for item in snapshot.occurrences[longest_range]
+        ],
+        "historyStartedAt": json.loads(snapshot.stats[longest_range])["historyStartedAt"],
+        "status": {key: status[key] for key in ("state", "modelName", "reconnectCount")},
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).digest()
+
+
+class PublicationSchedule:
+    """Publish data changes promptly and refresh quiet dashboards periodically."""
+
+    def __init__(self, settings: Settings) -> None:
+        # Leave freshness headroom for polling and network/cache delays when an
+        # installation uses a shorter stale threshold than the default 120s.
+        self.interval = min(
+            settings.dashboard_publish_interval_seconds,
+            settings.dashboard_max_stale_seconds / 2,
+        )
+        self.signature: bytes | None = None
+        self.published_at: float | None = None
+
+    def publish_if_due(
+        self, snapshot: Snapshot, write: Callable[[Snapshot], dict],
+    ) -> dict | None:
+        signature = publication_signature(snapshot)
+        if (
+            signature == self.signature
+            and self.published_at is not None
+            and time.monotonic() - self.published_at < self.interval
+        ):
+            return None
+        manifest = write(snapshot)
+        # Only a successful publication advances the schedule. A failed upload
+        # retries on the next poll; startup always publishes a fresh manifest.
+        self.signature = signature
+        self.published_at = time.monotonic()
+        return manifest
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -124,16 +176,22 @@ def main() -> None:
             from .r2_publisher import R2Publisher
 
             remote = R2Publisher(settings)
+
+        def write_snapshot(snapshot: Snapshot) -> dict:
+            if remote is not None:
+                return remote.publish(snapshot)
+            manifest = publish(snapshot, root, settings.dashboard_max_stale_seconds)
+            cleanup(root, manifest["version"], settings.dashboard_retention_seconds)
+            return manifest
+
+        schedule = PublicationSchedule(settings)
         while not stop.is_set():
             try:
                 snapshot = build_snapshot(settings)
-                if remote is not None:
-                    manifest = remote.publish(snapshot)
-                else:
-                    manifest = publish(snapshot, root, settings.dashboard_max_stale_seconds)
-                    cleanup(root, manifest["version"], settings.dashboard_retention_seconds)
-                logger.info("Opublikowano dashboard %s", manifest["version"])
-                heartbeat.ping()
+                manifest = schedule.publish_if_due(snapshot, write_snapshot)
+                if manifest is not None:
+                    logger.info("Opublikowano dashboard %s", manifest["version"])
+                    heartbeat.ping()
             except Exception:
                 logger.exception("Publikacja nie powiodła się; poprzednie pliki pozostają dostępne")
             stop.wait(settings.dashboard_refresh_seconds)

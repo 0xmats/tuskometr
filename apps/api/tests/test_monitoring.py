@@ -78,6 +78,7 @@ def test_publisher_signals_only_after_success(tmp_path, monkeypatch, fails):
     stop.is_set.side_effect = [False, True]
     monkeypatch.setattr(publisher.threading, "Event", lambda: stop)
     monkeypatch.setattr(publisher, "build_snapshot", lambda settings: object())
+    monkeypatch.setattr(publisher, "publication_signature", lambda snapshot: b"unchanged")
     monkeypatch.setattr(R2Publisher, "__init__", lambda self, settings: None)
     publish = MagicMock(return_value={"version": "test"})
     if fails:

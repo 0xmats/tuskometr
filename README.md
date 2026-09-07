@@ -14,6 +14,28 @@ history; the 30-day range appears after more than 7 days. Publishers include sta
 not query the production database. Deploy both publisher and frontend for these
 features; no database migration is needed.
 
+The publisher checks for changes every five seconds (`DASHBOARD_REFRESH_SECONDS=5`),
+and the frontend checks the manifest every five seconds. New mentions, historical
+inserts, edits, deletions and pipeline state/model/reconnect-count changes trigger
+publication on the next check. Audio/transcript heartbeat timestamps and lag alone
+do not trigger writes. During quiet periods, status and rolling charts refresh
+every 60 seconds (`DASHBOARD_PUBLISH_INTERVAL_SECONDS=60`), capped at half the
+stale-data threshold. A restart publishes immediately; failed publications retry
+on the next check without advancing the schedule. Both local and R2 publishing
+use this policy. Detection, transcription windows and the stored data are unchanged.
+
+Publication, polling and network time are additional; the R2 manifest retains its
+five-second cache TTL. In a quiet 30-day period, one publication per minute means
+about 216,000 R2 writes for four dashboards and their manifest, versus about
+2.59 million at one publication every five seconds. Changed history/bucket objects,
+new mentions, state transitions, restarts and retries add operations; these figures
+are estimates, not a guarantee of remaining within a free allowance. CDN caching
+must be configured separately as described in [production setup](deploy/production.md).
+
+Existing `.env` files with `DASHBOARD_REFRESH_SECONDS=30` override the new default:
+set that value to `5` when releasing this change. Deploy backend and frontend
+through **Build, Test and Deploy** from `main` for both improvements.
+
 ## Recovery after interruptions
 
 YouTube ingestion uses its DVR window by default (`YOUTUBE_DVR_ENABLED=true`,

@@ -277,7 +277,7 @@ function App() {
   const manifestQuery = useQuery({
     queryKey: ["manifest"],
     queryFn: fetchManifest,
-    refetchInterval: 15_000,
+    refetchInterval: 5_000,
     staleTime: 5_000,
     refetchOnWindowFocus: true,
   })
