@@ -442,9 +442,7 @@ function App() {
               <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
             </a>
           </div>
-          <div className="flex w-full justify-end">
-            <ShareResult dashboard={dashboard} />
-          </div>
+          <ShareResult dashboard={dashboard} />
         </section>
 
         {dataIsStale && (
