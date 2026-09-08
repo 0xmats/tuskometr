@@ -434,15 +434,6 @@ function App() {
             <h2 className="font-display text-3xl font-semibold leading-[1.2] tracking-[-0.035em] md:text-4xl">
               Ile razy padło nazwisko <span className="text-primary">Tusk</span> na kanale Republiki?
             </h2>
-            <a
-              href={`https://www.youtube.com/watch?v=${SOURCE_VIDEO_ID}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-1 text-sm text-muted-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-            >
-              Zobacz monitorowaną transmisję
-              <ArrowUpRight className="size-4 shrink-0" aria-hidden="true" />
-            </a>
           </div>
           <ShareResult dashboard={dashboard} />
         </section>
