@@ -7,7 +7,7 @@ import {
   Clock3,
   ExternalLink,
   ChartNoAxesCombined,
-  Mountain,
+  Flame,
   Radio,
   RefreshCw,
   SearchX,
@@ -475,7 +475,7 @@ function App() {
             icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours}
             detail={peakHourCaption(liveStats?.summary.peakHour)}
-            icon={Activity} detailIcon={Mountain} />
+            icon={Activity} detailIcon={Flame} />
           {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`}
             value={liveStats?.summary.last7Days} detail={dailyAverageCaption(liveStats?.summary.dailyAverage) ?? (liveStats ? "Niepełne dane do średniej" : undefined)}
             icon={BarChart3} detailIcon={liveStats?.summary.dailyAverage != null ? ChartNoAxesCombined : undefined} />}
