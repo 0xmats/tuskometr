@@ -94,3 +94,20 @@ def test_midnight_has_no_elapsed_day_to_compare():
 def test_missing_yesterday_clock_time_hides_comparison():
     now = datetime(2026, 3, 30, 0, 30, tzinfo=UTC)
     assert summary(now=now).yesterday_so_far is None
+
+
+def test_peak_uses_complete_clock_hours_and_earliest_tie():
+    now = NOW + timedelta(minutes=30)
+    times = [NOW - timedelta(hours=2, minutes=15)] * 3
+    times += [NOW - timedelta(hours=1, minutes=15)] * 3
+    times += [now] * 20  # The current partial hour must not win.
+    times += [now - timedelta(hours=24)] * 30  # Partial oldest hour, too.
+    peak = summary(times, now=now).peak_hour
+    assert peak.count == 3
+    assert peak.start == NOW - timedelta(hours=3)
+    assert peak.end == NOW - timedelta(hours=2)
+
+
+def test_peak_hidden_without_coverage_or_mentions():
+    assert summary().peak_hour is None
+    assert summary([NOW - timedelta(hours=1)], covered=[]).peak_hour is None

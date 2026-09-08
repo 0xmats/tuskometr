@@ -26,6 +26,12 @@ class OccurrencePage(ApiModel):
     next_cursor: int | None = Field(default=None, serialization_alias="nextCursor")
 
 
+class PeakHour(ApiModel):
+    count: int
+    start: datetime
+    end: datetime
+
+
 class StatSummary(ApiModel):
     last_hour: int = Field(default=0, serialization_alias="lastHour")
     today: int
@@ -33,6 +39,7 @@ class StatSummary(ApiModel):
     last_7_days: int = Field(serialization_alias="last7Days")
     yesterday_so_far: int | None = Field(default=None, serialization_alias="yesterdaySoFar")
     previous_24_hours: int | None = Field(default=None, serialization_alias="previous24Hours")
+    peak_hour: PeakHour | None = Field(default=None, serialization_alias="peakHour")
     daily_average: float | None = Field(default=None, serialization_alias="dailyAverage")
 
 

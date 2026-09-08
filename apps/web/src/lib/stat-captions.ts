@@ -15,3 +15,13 @@ export function dailyAverageCaption(average: number | null | undefined): string 
   if (average == null) return undefined
   return `Średnio ${average.toLocaleString('pl-PL', { maximumFractionDigits: 1 })} dziennie`
 }
+
+export function peakHourCaption(peak: { count: number; start: string; end: string } | null | undefined): string | undefined {
+  if (!peak) return undefined
+  const plural = new Intl.PluralRules('pl-PL').select(peak.count)
+  const noun = plural === 'one' ? 'wzmianka' : plural === 'few' ? 'wzmianki' : 'wzmianek'
+  const hour = (value: string) => new Intl.DateTimeFormat('pl-PL', {
+    timeZone: 'Europe/Warsaw', hour: 'numeric', hourCycle: 'h23',
+  }).format(new Date(value))
+  return `Szczyt: ${peak.count.toLocaleString('pl-PL')} ${noun} (${hour(peak.start)}–${hour(peak.end)})`
+}

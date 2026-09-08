@@ -1,9 +1,10 @@
 """Comparable source-time windows for dashboard captions."""
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .history import uncovered_ranges
-from .schemas import StatSummary
+from .schemas import PeakHour, StatSummary
 
 
 def build_summary(
@@ -35,10 +36,20 @@ def build_summary(
                 return False
         return True
 
+    peak_hour = None
+    if complete(now - day):
+        hours = Counter(t.astimezone(zone).replace(minute=0, second=0, microsecond=0).astimezone(UTC)
+                        for t in timestamps if now - day <= t <= now)
+        for start, total in sorted(hours.items()):
+            end = start + timedelta(hours=1)
+            if start >= now - day and end <= now and (peak_hour is None or total > peak_hour.count):
+                peak_hour = PeakHour(count=total, start=start, end=end)
+
     last_week = count(now - 7 * day)
     average_start = max(now - 7 * day, history_started_at.astimezone(UTC)) if history_started_at else now - 7 * day
     elapsed_days = (now - average_start).total_seconds() / day.total_seconds()
     return StatSummary(
+        peak_hour=peak_hour,
         last_hour=count(now - timedelta(hours=1)),
         today=count(today),
         last_24_hours=count(now - day),

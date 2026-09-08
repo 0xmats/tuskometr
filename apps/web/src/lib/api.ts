@@ -23,6 +23,7 @@ export type Stats = {
     last7Days: number
     yesterdaySoFar?: number | null
     previous24Hours?: number | null
+    peakHour?: { count: number; start: string; end: string } | null
     dailyAverage?: number | null
   }
   range: {

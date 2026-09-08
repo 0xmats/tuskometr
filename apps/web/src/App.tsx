@@ -14,7 +14,7 @@ import {
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis, usePlotArea } from "recharts"
 
 import { ShareResult } from "@/components/share-result"
-import { comparisonCaption, dailyAverageCaption } from "@/lib/stat-captions"
+import { comparisonCaption, dailyAverageCaption, peakHourCaption } from "@/lib/stat-captions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -467,7 +467,7 @@ function App() {
             detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "Względem dnia wczorajszego")}
             icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours}
-            detail={comparisonCaption(liveStats?.summary.last24Hours, liveStats?.summary.previous24Hours, "względem poprzednich 24 godz.")}
+            detail={peakHourCaption(liveStats?.summary.peakHour)}
             icon={Activity} />
           {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`}
             value={liveStats?.summary.last7Days} detail={dailyAverageCaption(liveStats?.summary.dailyAverage) ?? (liveStats ? "Niepełne dane do średniej" : undefined)} icon={BarChart3} />}
