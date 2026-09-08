@@ -53,6 +53,20 @@ Existing `.env` files with `DASHBOARD_REFRESH_SECONDS=30` override the new defau
 set that value to `5` when releasing this change. Deploy backend and frontend
 through **Build, Test and Deploy** from `main` for both improvements.
 
+## Sharing results
+
+“Udostępnij wynik” freezes the displayed numbers and publication timestamp.
+The browser draws a 1200 × 630 PNG locally; the preview and download use the same
+blob. Native sharing includes the PNG when supported, with a link fallback.
+No share images, pages or records are written to R2 or the backend.
+
+The shared link always points to the live site's root, without query parameters,
+fragments or embedded statistics. Opening it loads the normal live dashboard.
+Only the PNG preserves the captured numbers and timestamp. Attach it to show those
+numbers in a social post. This feature adds no R2 storage, writes or share-related
+reads; visits to the live site use its existing data publication and caching policy.
+No backend dependencies, deployment configuration or storage migrations are needed.
+
 ## Recovery after interruptions
 
 YouTube ingestion uses its DVR window by default (`YOUTUBE_DVR_ENABLED=true`,

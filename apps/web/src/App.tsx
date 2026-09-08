@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis, usePlotArea } from "recharts"
 
+import { ShareResult } from "@/components/share-result"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -217,14 +218,7 @@ function TimelineItem({ item, timeline }: { item: Occurrence; timeline: ReturnTy
               <RefreshCw className="size-4" />Spróbuj ponownie
             </Button>
           </div>
-        ) : (
-          <Button asChild variant="outline" size="sm">
-            <a href={item.sourceUrl} target="_blank" rel="noreferrer">
-              <ExternalLink className="size-4" />
-              Zobacz kanał
-            </a>
-          </Button>
-        )}
+        ) : null}
       </div>
     </article>
   )
@@ -433,12 +427,13 @@ function App() {
       </header>
 
       <main className="mx-auto max-w-[1280px] px-5 py-9 md:px-8 md:py-12">
-        <section id="overview" className="mb-9">
+        <section id="overview" className="mb-9 flex flex-wrap items-end justify-between gap-5">
           <div className="max-w-2xl">
             <h2 className="font-display text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.045em] md:text-5xl xl:text-[3.5rem]">
               Ile razy padło nazwisko <span className="text-primary">Tusk?</span>
             </h2>
           </div>
+          <ShareResult dashboard={dashboard} />
         </section>
 
         {dataIsStale && (
@@ -632,15 +627,22 @@ function App() {
           <section aria-labelledby="about-project" className="max-w-3xl space-y-2">
             <h2 id="about-project" className="text-sm font-medium text-foreground">O projekcie</h2>
             <p>
-              Tuskometr liczy wystąpienia nazwiska „Tusk” w transmisji Telewizji Republika.
+              Tuskometr zlicza, ile razy nazwisko „Tusk” — także w odmienionych formach —
+              pada w publicznej transmisji Telewizji Republika na YouTube. Wyniki aktualizują
+              się automatycznie, a przy wzmiankach pokazujemy treść wypowiedzi.
             </p>
             <p>
-              Transkrypcje są automatyczne i mogą zawierać błędy. Projekt nie jest powiązany
-              z Telewizją Republika ani YouTube.
+              Przycisk „Zobacz fragment” prowadzi do momentu wypowiedzi w nagraniu.
+              Linki są dostępne tylko dla wzmianek z ostatnich 12 godzin, ponieważ transmisję
+              można cofnąć najwyżej o 12 godzin. Starsze wzmianki pozostają w zestawieniu,
+              ale bez odnośnika do nagrania.
             </p>
-            <p>Źródło: publiczna transmisja Telewizji Republika w YouTube.</p>
+            <p>
+              Wypowiedzi rozpoznajemy automatycznie, więc cytaty i wyniki mogą zawierać błędy.
+              Tuskometr jest niezależnym projektem, niepowiązanym z Telewizją Republika ani YouTube.
+            </p>
             {liveStats?.historyStartedAt && (
-              <p>Zbieramy dane od {formatDate(liveStats.historyStartedAt)}, {formatTime(liveStats.historyStartedAt)} (czas polski).</p>
+              <p>Dane zbieramy od {formatDate(liveStats.historyStartedAt)}, godz. {formatTime(liveStats.historyStartedAt)}. Wszystkie daty i godziny podajemy w czasie polskim.</p>
             )}
           </section>
         </footer>
