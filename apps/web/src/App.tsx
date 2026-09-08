@@ -402,7 +402,6 @@ function App() {
         <div className="flex flex-wrap items-center justify-between gap-5 py-8 md:py-10">
           <div>
             <h1 className="font-display text-5xl font-semibold tracking-[-0.065em] sm:text-7xl">Tuskometr<span className="text-primary">.</span></h1>
-            <p className="mt-2 text-xs text-muted-foreground sm:text-sm">Wzmianki o Donaldzie Tusku w Republika TV</p>
           </div>
           {status?.state === "live" && (
             <span className="flex items-center gap-2.5 rounded-full border border-primary/15 bg-primary/5 px-3.5 py-2 text-[10px] font-semibold tracking-[0.12em] text-primary" aria-label="Na żywo">
@@ -430,8 +429,17 @@ function App() {
         <section id="overview" className="mb-9 flex flex-wrap items-end justify-between gap-5">
           <div className="max-w-2xl">
             <h2 className="font-display text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.045em] md:text-5xl xl:text-[3.5rem]">
-              Ile razy padło nazwisko <span className="text-primary">Tusk?</span>
+              Ile razy padło nazwisko <span className="text-primary">Tusk</span> na kanale Republiki?
             </h2>
+            <a
+              href={`https://www.youtube.com/watch?v=${SOURCE_VIDEO_ID}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center gap-1 text-sm text-muted-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+            >
+              Zobacz monitorowaną transmisję
+              <ArrowUpRight className="size-4 shrink-0" aria-hidden="true" />
+            </a>
           </div>
           <ShareResult dashboard={dashboard} />
         </section>
