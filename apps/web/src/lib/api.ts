@@ -21,6 +21,9 @@ export type Stats = {
     today: number
     last24Hours: number
     last7Days: number
+    yesterdaySoFar?: number | null
+    previous24Hours?: number | null
+    dailyAverage?: number | null
   }
   range: {
     from: string

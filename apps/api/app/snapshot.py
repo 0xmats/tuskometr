@@ -13,6 +13,8 @@ from sqlalchemy import func, select
 
 from .config import Settings
 from .db import SessionLocal
+from .history import coverage
+from .summary import build_summary
 from .models import Occurrence, PipelineState, SourceSession, TranscriptSegment
 from .schemas import (
     DashboardResponse,
@@ -23,7 +25,6 @@ from .schemas import (
     StatBucket,
     StatRange,
     StatsResponse,
-    StatSummary,
     StatusResponse,
 )
 
@@ -143,6 +144,7 @@ def build_snapshot(
             .order_by(Occurrence.occurred_at.desc(), Occurrence.id.desc())
         ).all()
         items = tuple(occurrence_dto(row) for row in rows)
+        covered = coverage(db, settings.source_url, now - timedelta(days=7), now)
         state = db.get(PipelineState, 1)
         status = StatusResponse(
             state=state.state if state else "offline",
@@ -160,13 +162,7 @@ def build_snapshot(
         status.last_audio_at is None or now - status.last_audio_at > timedelta(seconds=120)
     ):
         status.state = "offline"
-    today = now.astimezone(zone).replace(hour=0, minute=0, second=0, microsecond=0)
-    summary = StatSummary(
-        last_hour=sum(item.occurred_at >= now - timedelta(hours=1) for item in items),
-        today=sum(item.occurred_at >= today for item in items),
-        last_24_hours=sum(item.occurred_at >= now - timedelta(days=1) for item in items),
-        last_7_days=sum(item.occurred_at >= now - timedelta(days=7) for item in items),
-    )
+    summary = build_summary([item.occurred_at for item in items], now, zone, covered)
     dashboards: dict[int, bytes] = {}
     stats: dict[int, bytes] = {}
     occurrences = {

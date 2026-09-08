@@ -31,6 +31,9 @@ class StatSummary(ApiModel):
     today: int
     last_24_hours: int = Field(serialization_alias="last24Hours")
     last_7_days: int = Field(serialization_alias="last7Days")
+    yesterday_so_far: int | None = Field(default=None, serialization_alias="yesterdaySoFar")
+    previous_24_hours: int | None = Field(default=None, serialization_alias="previous24Hours")
+    daily_average: float | None = Field(default=None, serialization_alias="dailyAverage")
 
 
 class StatRange(ApiModel):

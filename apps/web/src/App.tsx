@@ -14,6 +14,7 @@ import {
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis, usePlotArea } from "recharts"
 
 import { ShareResult } from "@/components/share-result"
+import { comparisonCaption, dailyAverageCaption } from "@/lib/stat-captions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -152,7 +153,7 @@ function StatCard({
 }: {
   label: string
   value?: number
-  detail: string
+  detail?: string
   icon: typeof Activity
 }) {
   return (
@@ -165,7 +166,7 @@ function StatCard({
       </CardHeader>
       <CardContent className="p-0 md:px-0 md:pb-0">
         {value === undefined ? <Skeleton className="mb-2 h-9 w-20" /> : <p className="font-display text-5xl font-semibold tracking-[-0.05em] tabular-nums">{value.toLocaleString("pl-PL")}</p>}
-        <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
+        {detail && <p className="mt-2 text-xs text-muted-foreground">{detail}</p>}
       </CardContent>
     </Card>
   )
@@ -453,7 +454,7 @@ function App() {
         )}
         <section className={`stat-grid grid overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 sm:grid-cols-2 ${showWeeklySummary ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
           <div className="bg-primary px-5 py-6 text-white md:px-7" aria-label="Tusków na godzinę">
-            <p className="text-xs font-medium">Tusków na godzinę</p>
+            <p className="font-display text-xl font-bold leading-tight tracking-tight">Tusków na godzinę</p>
             <div className="my-2 flex items-baseline gap-2">
               <span className="font-display text-6xl font-semibold tracking-[-0.05em] tabular-nums">
                 {liveStats?.summary.lastHour?.toLocaleString("pl-PL") ?? "—"}
@@ -462,9 +463,14 @@ function App() {
             </div>
             <p className="text-xs text-white/90">{hourlyFrequencyLabel(liveStats?.summary.lastHour)}</p>
           </div>
-          <StatCard label="Dzisiaj" value={liveStats?.summary.today} detail="wystąpień nazwiska Tusk" icon={Clock3} />
-          <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours} detail="wystąpień nazwiska Tusk" icon={Activity} />
-          {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`} value={liveStats?.summary.last7Days} detail="wystąpień nazwiska Tusk" icon={BarChart3} />}
+          <StatCard label="Dzisiaj" value={liveStats?.summary.today}
+            detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "względem wczoraj o tej porze")}
+            icon={Clock3} />
+          <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours}
+            detail={comparisonCaption(liveStats?.summary.last24Hours, liveStats?.summary.previous24Hours, "względem poprzednich 24 godz.")}
+            icon={Activity} />
+          {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`}
+            value={liveStats?.summary.last7Days} detail={dailyAverageCaption(liveStats?.summary.dailyAverage)} icon={BarChart3} />}
 
         </section>
 
