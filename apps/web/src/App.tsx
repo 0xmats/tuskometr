@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState } from "react"
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import {
   Activity,
@@ -150,25 +150,23 @@ function StatCard({
   value,
   detail,
   icon: Icon,
-  featured = false,
 }: {
-  label: ReactNode
+  label: string
   value?: number
   detail?: string
   icon: typeof Activity
-  featured?: boolean
 }) {
   return (
-    <Card className={`rounded-none border-0 px-5 py-6 md:px-7 ${featured ? "bg-primary text-white" : "bg-transparent"}`}>
+    <Card className="rounded-none border-0 bg-transparent px-5 py-6 md:px-7">
       <CardHeader className="p-0 pb-3 md:px-0">
         <div className="flex items-center justify-between">
-          <CardDescription className={`text-sm leading-5 ${featured ? "font-normal text-white" : "font-medium"}`}>{label}</CardDescription>
-          <Icon className={`size-4 shrink-0 ${featured ? "text-white/80" : "text-muted-foreground"}`} aria-hidden="true" />
+          <CardDescription className="text-sm font-medium leading-5">{label}</CardDescription>
+          <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         </div>
       </CardHeader>
       <CardContent className="p-0 md:px-0 md:pb-0">
         {value === undefined ? <Skeleton className="mb-2 h-9 w-20" /> : <p className="font-display text-5xl font-semibold tracking-[-0.05em] tabular-nums">{value.toLocaleString("pl-PL")}</p>}
-        <p className={`mt-2 min-h-8 text-xs leading-4 ${featured ? "text-white/90" : "text-muted-foreground"}`}>{detail}</p>
+        {detail && <p className="mt-2 text-xs leading-4 text-muted-foreground">{detail}</p>}
       </CardContent>
     </Card>
   )
@@ -446,9 +444,16 @@ function App() {
           </p>
         )}
         <section className={`stat-grid grid overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 sm:grid-cols-2 ${showWeeklySummary ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
-          <StatCard label={<><strong className="font-bold">Tusk</strong>ów na godzinę</>}
-            value={liveStats?.summary.lastHour} detail={hourlyFrequencyLabel(liveStats?.summary.lastHour)}
-            icon={Radio} featured />
+          <div className="bg-primary px-5 py-6 text-white md:px-7" aria-label="Tusków na godzinę">
+            <p className="text-base leading-5"><strong className="font-bold">Tusk</strong>ów na godzinę</p>
+            <div className="my-2 flex items-baseline gap-2">
+              <span className="font-display text-6xl font-semibold tracking-[-0.05em] tabular-nums">
+                {liveStats?.summary.lastHour?.toLocaleString("pl-PL") ?? "—"}
+              </span>
+              <span className="text-sm text-white/85">/ godz.</span>
+            </div>
+            <p className="text-xs leading-4 text-white/90">{hourlyFrequencyLabel(liveStats?.summary.lastHour)}</p>
+          </div>
           <StatCard label="Dzisiaj" value={liveStats?.summary.today}
             detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "względem wczoraj o tej porze")}
             icon={Clock3} />

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import type { Plugin } from "vite"
 
 type Fixture = {
+  comparisons?: { yesterdaySoFar: number; previous24Hours: number }
   historyDays: number
   staleAfterSeconds: number
   status: { state: string; lagSeconds: number; reconnectCount: number; message: string | null }
@@ -27,6 +28,7 @@ export function buildMockDashboard(fixture: Fixture, now = Date.now()) {
     timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date(value))
   const summary = {
+    ...fixture.comparisons,
     lastHour: within(3_600_000).length,
     today: all.filter(item => polishDate(Date.parse(item.occurredAt)) === polishDate(now)).length,
     last24Hours: within(day).length,

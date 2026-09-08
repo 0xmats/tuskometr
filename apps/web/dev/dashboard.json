@@ -1,6 +1,7 @@
 {
   "description": "Synthetic frontend fixtures; no real broadcasts or production data. Edit this JSON and the preview reloads.",
   "historyDays": 45,
+  "comparisons": { "yesterdaySoFar": 48, "previous24Hours": 49 },
   "staleAfterSeconds": 31536000,
   "status": {
     "state": "live",
