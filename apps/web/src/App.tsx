@@ -429,7 +429,7 @@ function App() {
       <main className="mx-auto max-w-[1280px] px-5 py-9 md:px-8 md:py-12">
         <section id="overview" className="mb-9 flex flex-wrap items-end justify-between gap-5">
           <div className="max-w-2xl">
-            <h2 className="font-display text-3xl font-semibold leading-[1.2] tracking-[-0.035em] md:text-4xl">
+            <h2 className="font-display text-[2rem] font-semibold leading-[1.2] tracking-[-0.035em] md:text-[2.5rem]">
               Ile razy padło nazwisko <span className="text-primary">Tusk</span> na kanale Republiki?
             </h2>
           </div>
@@ -455,7 +455,7 @@ function App() {
             <p className="text-xs leading-4 text-white/90">{hourlyFrequencyLabel(liveStats?.summary.lastHour)}</p>
           </div>
           <StatCard label="Dzisiaj" value={liveStats?.summary.today}
-            detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "względem wczoraj o tej porze")}
+            detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "w porównaniu z wczorajszym wynikiem do tej samej godziny")}
             icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours}
             detail={comparisonCaption(liveStats?.summary.last24Hours, liveStats?.summary.previous24Hours, "względem poprzednich 24 godz.")}
