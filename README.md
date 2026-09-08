@@ -55,9 +55,12 @@ through **Build, Test and Deploy** from `main` for both improvements.
 
 ## Sharing results
 
-“Udostępnij wynik” freezes the displayed numbers and publication timestamp.
-The browser draws a 1200 × 630 PNG locally; the preview and download use the same
-blob. Native sharing includes the PNG when supported, with a link fallback.
+“Udostępnij” immediately copies the live-site link and shows a compact confirmation
+with an optional “Kopiuj obrazek” action. Only that action draws a 1200 × 630 PNG in
+the browser and copies it to the clipboard, using the displayed numbers and
+publication timestamp at click time. Download is offered only if image clipboard
+access is unavailable or denied.
+If clipboard access is denied, the panel offers the link for manual copying.
 No share images, pages or records are written to R2 or the backend.
 
 The shared link always points to the live site's root, without query parameters,

@@ -1,111 +1,134 @@
 import { useEffect, useRef, useState } from "react"
-import { Copy, Download, Share2, X } from "lucide-react"
+import { Check, Copy, Download, Loader2, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Dashboard } from "@/lib/api"
-import { renderShareCard, shareUrl, snapshotAlt, snapshotDate, snapshotFromDashboard, type ShareSnapshot } from "@/lib/share"
-
-function ShareCard({ snapshot }: { snapshot: ShareSnapshot }) {
-  const [card, setCard] = useState<{ url: string; blob: Blob } | null>(null)
-  const [error, setError] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  const [message, setMessage] = useState("")
-  const active = useRef(false)
-  const pageUrl = shareUrl()
-  useEffect(() => {
-    let cancelled = false
-    let url: string | undefined
-    active.current = true
-    setCard(null)
-    setError(false)
-    renderShareCard(snapshot).then(blob => {
-      if (cancelled) return
-      url = URL.createObjectURL(blob)
-      setCard({ url, blob })
-    }).catch(() => { if (!cancelled) setError(true) })
-    return () => {
-      cancelled = true
-      active.current = false
-      if (url) URL.revokeObjectURL(url)
-    }
-  }, [snapshot, attempt])
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(pageUrl)
-      if (active.current) setMessage("Link skopiowany.")
-    } catch {
-      if (active.current) setMessage("Zaznacz i skopiuj link z pola poniżej.")
-    }
-  }
-
-  const filename = `tuskometr-${snapshot.generatedAt.replace(/[^0-9]/g, "").slice(0, 14)}.png`
-  async function share() {
-    try {
-      const file = card ? new File([card.blob], filename, { type: "image/png" }) : null
-      // The image is ready before the click, preserving native user activation.
-      const files = file && navigator.canShare?.({ files: [file] }) ? [file] : undefined
-      await navigator.share({ title: "Tuskometr", url: pageUrl, ...(files ? { files } : {}) })
-    } catch (error) {
-      if (active.current && !(error instanceof DOMException && error.name === "AbortError")) {
-        setMessage("Udostępnianie jest niedostępne. Skopiuj link lub pobierz PNG.")
-      }
-    }
-  }
-
-  return <>
-    <div className="my-5 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-      {error ? <div className="p-5"><p role="alert" className="text-sm">Nie udało się utworzyć obrazka.</p>
-        <Button variant="outline" className="mt-3" onClick={() => setAttempt(value => value + 1)}>Spróbuj ponownie</Button></div>
-        : card ? <img src={card.url} width="1200" height="630" className="h-auto w-full" alt={snapshotAlt(snapshot)} />
-          : <p role="status" className="p-5 text-sm">Przygotowywanie podglądu…</p>}
-    </div>
-    <div className="flex flex-wrap gap-2">
-      <Button onClick={copy}><Copy className="size-4" />Kopiuj link</Button>
-      {card ? <Button variant="outline" asChild><a href={card.url} download={filename}><Download className="size-4" />Pobierz PNG</a></Button>
-        : <Button variant="outline" disabled><Download className="size-4" />Pobierz PNG</Button>}
-      {typeof navigator.share === "function" && <Button variant="outline" onClick={share}><Share2 className="size-4" />Udostępnij…</Button>}
-    </div>
-    <label htmlFor="share-link" className="mt-5 block text-xs text-muted-foreground">Link do aktualnej strony</label>
-    <input id="share-link" readOnly value={pageUrl} onFocus={event => event.target.select()}
-      className="mt-2 w-full rounded-md border border-slate-200 p-2 text-sm focus:outline-primary" />
-    <p role="status" className="mt-2 min-h-5 text-sm">{message}</p>
-    <p className="text-xs text-muted-foreground">PNG zachowuje pokazany wynik. Link prowadzi do aktualnych statystyk.</p>
-  </>
-}
+import { renderShareCard, shareUrl, snapshotFromDashboard } from "@/lib/share"
 
 export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
-  const dialog = useRef<HTMLDialogElement>(null)
-  const [snapshot, setSnapshot] = useState<ShareSnapshot | null>(null)
+  const container = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const operation = useRef(0)
+  const [alignLeft, setAlignLeft] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [copyState, setCopyState] = useState<"copying" | "copied" | "failed">("copying")
+  const [busy, setBusy] = useState(false)
+  const [imageCopied, setImageCopied] = useState(false)
+  const [fallback, setFallback] = useState<{ blob: Blob; filename: string } | null>(null)
+  const [error, setError] = useState(false)
+
   useEffect(() => {
-    if (!snapshot) return
-    const element = dialog.current!
-    element.showModal()
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    return () => {
-      element.close()
-      document.body.style.overflow = overflow
+    return () => { operation.current++ }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    const position = () => setAlignLeft((container.current?.getBoundingClientRect().right ?? 0) < 276)
+    position()
+    window.addEventListener("resize", position)
+    const dismiss = () => {
+      operation.current++
+      setOpen(false)
+      setBusy(false)
     }
-  }, [snapshot])
-  return <>
-    <Button variant="outline" disabled={!dashboard} onClick={() => {
-      setSnapshot(snapshotFromDashboard(dashboard!, import.meta.env.VITE_MOCK_DATA === "true"))
-    }}><Share2 className="size-4" />Udostępnij wynik</Button>
-    {snapshot && <dialog ref={dialog} aria-labelledby="share-title" aria-describedby="share-description"
-      onClose={() => setSnapshot(null)}
-      onClick={event => { if (event.target === event.currentTarget) dialog.current?.close() }}
-      className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 text-foreground shadow-xl backdrop:bg-slate-950/50">
-      <div className="p-5 sm:p-7">
-        <div className="flex items-start justify-between gap-4">
-          <div><h2 id="share-title" className="text-xl font-semibold">Udostępnij wynik</h2>
-            <p id="share-description" className="mt-2 text-sm text-muted-foreground">Obrazek przedstawia stan z {snapshotDate(snapshot)} (czas polski).</p>
-          </div>
-          <Button autoFocus variant="ghost" size="icon" aria-label="Zamknij" className="shrink-0"
-            onClick={() => dialog.current?.close()}><X className="size-5" /></Button>
-        </div>
-        <ShareCard snapshot={snapshot} />
-        <a href={shareUrl()} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-primary underline underline-offset-4">Otwórz aktualną stronę</a>
-      </div>
-    </dialog>}
-  </>
+    const outside = (event: PointerEvent) => {
+      if (!container.current?.contains(event.target as Node)) dismiss()
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        dismiss()
+        trigger.current?.focus()
+      }
+    }
+    document.addEventListener("pointerdown", outside)
+    document.addEventListener("keydown", escape)
+    return () => {
+      window.removeEventListener("resize", position)
+      document.removeEventListener("pointerdown", outside)
+      document.removeEventListener("keydown", escape)
+    }
+  }, [open])
+
+  async function copy() {
+    const current = ++operation.current
+    setOpen(true)
+    setCopyState("copying")
+    setImageCopied(false)
+    setFallback(null)
+    setError(false)
+    setBusy(false)
+    try {
+      await navigator.clipboard.writeText(shareUrl())
+      if (operation.current === current) setCopyState("copied")
+    } catch {
+      if (operation.current === current) setCopyState("failed")
+    }
+  }
+
+  async function copyImage() {
+    if (!dashboard || busy) return
+    const current = operation.current
+    const snapshot = snapshotFromDashboard(dashboard, import.meta.env.VITE_MOCK_DATA === "true")
+    const filename = `tuskometr-${snapshot.generatedAt.replace(/[^0-9]/g, "").slice(0, 14)}.png`
+    setBusy(true)
+    setError(false)
+    setImageCopied(false)
+    setFallback(null)
+    // Pass the pending PNG to ClipboardItem while user activation is still live
+    // (not after awaiting canvas/font rendering, which can fail in Safari).
+    const png = renderShareCard(snapshot)
+    // Rendering can reject before clipboard permissions resolve.
+    void png.catch(() => {})
+    try {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") throw new Error("Clipboard unavailable")
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })])
+      if (operation.current === current) setImageCopied(true)
+    } catch {
+      try {
+        const blob = await png
+        if (operation.current === current) setFallback({ blob, filename })
+      } catch {
+        if (operation.current === current) setError(true)
+      }
+    } finally {
+      if (operation.current === current) setBusy(false)
+    }
+  }
+
+  function download() {
+    if (!fallback) return
+    const url = URL.createObjectURL(fallback.blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = fallback.filename
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+
+  return <div ref={container} className="relative">
+    <Button ref={trigger} variant="outline" disabled={busy} onClick={copy} aria-expanded={open} aria-controls="share-options">
+      <Share2 className="size-4" />Udostępnij
+    </Button>
+    {open && <div id="share-options" role="region" aria-label="Udostępnianie"
+      className={`absolute ${alignLeft ? "left-0" : "right-0"} top-full z-30 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg`}>
+      <p role="status" className="flex items-center gap-2 px-1 py-2 text-sm">
+        {(imageCopied || copyState === "copied") && <Check className="size-4 text-primary" />}
+        {imageCopied ? "Obrazek skopiowany" : copyState === "copied" ? "Link skopiowany" : copyState === "copying" ? "Kopiowanie linku…" : "Skopiuj link ręcznie:"}
+      </p>
+      {copyState === "failed" && !imageCopied && <input aria-label="Link do strony" readOnly value={shareUrl()}
+        onFocus={event => event.target.select()}
+        className="mb-2 w-full rounded-md border border-slate-200 p-2 text-sm focus:outline-primary" />}
+      {fallback ? <>
+        <p className="px-1 py-2 text-xs text-muted-foreground">Nie można skopiować obrazka. Możesz go pobrać.</p>
+        <Button variant="ghost" className="w-full justify-start" onClick={download}>
+          <Download className="size-4" />Pobierz PNG
+        </Button>
+      </> : <Button variant="ghost" className="w-full justify-start" disabled={!dashboard || busy} onClick={copyImage}>
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Copy className="size-4" />}
+        {busy ? "Kopiowanie obrazka…" : "Kopiuj obrazek"}
+      </Button>}
+      {error && <p role="alert" className="px-1 pt-2 text-xs text-primary">Nie udało się utworzyć PNG. Spróbuj ponownie.</p>}
+    </div>}
+  </div>
 }
