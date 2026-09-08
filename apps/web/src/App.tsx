@@ -162,14 +162,14 @@ function StatCard({
 }) {
   return (
     <Card className="rounded-none border-0 bg-transparent px-5 py-6 md:px-7">
-      <CardHeader className="p-0 pb-3 md:px-0">
+      <CardHeader className="p-0 pb-2 md:px-0">
         <div className="flex items-center justify-between">
-          <CardDescription className="text-sm font-medium leading-5">{label}</CardDescription>
+          <CardDescription className="text-base leading-5">{label}</CardDescription>
           <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         </div>
       </CardHeader>
       <CardContent className="p-0 md:px-0 md:pb-0">
-        {value === undefined ? <Skeleton className="mb-2 h-9 w-20" /> : <p className="font-display text-5xl font-semibold tracking-[-0.05em] tabular-nums">{value.toLocaleString("pl-PL")}</p>}
+        {value === undefined ? <Skeleton className="h-15 w-20" /> : <p className="font-display text-6xl font-semibold tracking-[-0.05em] tabular-nums">{value.toLocaleString("pl-PL")}</p>}
         {detail && <p className="mt-2 flex items-start gap-1 text-xs leading-4 text-muted-foreground">
           {DetailIcon && <DetailIcon className="mt-0.5 size-3 shrink-0" aria-hidden="true" />}
           <span>{detail}</span>
