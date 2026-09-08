@@ -162,7 +162,10 @@ def build_snapshot(
         status.last_audio_at is None or now - status.last_audio_at > timedelta(seconds=120)
     ):
         status.state = "offline"
-    summary = build_summary([item.occurred_at for item in items], now, zone, covered)
+    summary = build_summary(
+        [item.occurred_at for item in items], now, zone, covered,
+        aware(history_started_at) if history_started_at else None,
+    )
     dashboards: dict[int, bytes] = {}
     stats: dict[int, bytes] = {}
     occurrences = {

@@ -50,9 +50,31 @@ def test_processing_lag_allowed_but_outage_and_missing_coverage_hidden():
         assert summary(covered=covered).previous_24_hours is None
 
 
-def test_average_requires_full_week():
+def test_average_hides_gaps_before_available_coverage():
     result = summary(covered=[(NOW - timedelta(days=6), NOW)])
     assert result.previous_24_hours == 0
+    assert result.daily_average is None
+
+
+def test_average_uses_actual_elapsed_history_including_partial_days():
+    start = NOW - timedelta(days=2, hours=12)
+    result = build_summary([NOW] * 1250, NOW, ZONE, [(start, NOW)], start)
+    assert result.daily_average == 500
+    assert result.last_7_days == 1250
+
+
+def test_average_remains_a_rolling_week_with_longer_history():
+    start = NOW - timedelta(days=10)
+    result = build_summary([NOW] * 700, NOW, ZONE, [(start, NOW)], start)
+    assert result.daily_average == 100
+
+
+def test_partial_history_average_still_requires_coverage_and_one_day():
+    start = NOW - timedelta(days=3)
+    result = build_summary([NOW], NOW, ZONE, [(start + timedelta(hours=1), NOW)], start)
+    assert result.daily_average is None
+    start = NOW - timedelta(hours=12)
+    result = build_summary([NOW], NOW, ZONE, [(start, NOW)], start)
     assert result.daily_average is None
 
 

@@ -6,7 +6,10 @@ from .history import uncovered_ranges
 from .schemas import StatSummary
 
 
-def build_summary(timestamps: list[datetime], now: datetime, zone: ZoneInfo, covered) -> StatSummary:
+def build_summary(
+    timestamps: list[datetime], now: datetime, zone: ZoneInfo, covered,
+    history_started_at: datetime | None = None,
+) -> StatSummary:
     now = now.astimezone(UTC)
     local = now.astimezone(zone)
     today = local.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -33,6 +36,8 @@ def build_summary(timestamps: list[datetime], now: datetime, zone: ZoneInfo, cov
         return True
 
     last_week = count(now - 7 * day)
+    average_start = max(now - 7 * day, history_started_at.astimezone(UTC)) if history_started_at else now - 7 * day
+    elapsed_days = (now - average_start).total_seconds() / day.total_seconds()
     return StatSummary(
         last_hour=count(now - timedelta(hours=1)),
         today=count(today),
@@ -42,5 +47,7 @@ def build_summary(timestamps: list[datetime], now: datetime, zone: ZoneInfo, cov
                           if comparable_clock and complete(today) and complete(yesterday, yesterday_end) else None),
         previous_24_hours=(count(now - 2 * day, now - day, include_end=False)
                            if complete(now - 2 * day) else None),
-        daily_average=last_week / 7 if complete(now - 7 * day) else None,
+        # Normalize by actual elapsed time, not the rounded-up day count in the UI.
+        daily_average=(last_week / elapsed_days
+                       if elapsed_days >= 1 and complete(average_start) else None),
     )

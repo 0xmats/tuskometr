@@ -31,6 +31,7 @@ export function buildMockDashboard(fixture: Fixture, now = Date.now()) {
     today: all.filter(item => polishDate(Date.parse(item.occurredAt)) === polishDate(now)).length,
     last24Hours: within(day).length,
     last7Days: within(7 * day).length,
+    dailyAverage: fixture.historyDays >= 1 ? within(7 * day).length / Math.min(7, fixture.historyDays) : null,
   }
   const ascending = [...all].reverse().filter(item => Date.parse(item.occurredAt) <= now)
   let hourlyRecord: { count: number; start: string; end: string } | null = null

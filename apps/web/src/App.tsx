@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import {
   Activity,
@@ -150,23 +150,25 @@ function StatCard({
   value,
   detail,
   icon: Icon,
+  featured = false,
 }: {
-  label: string
+  label: ReactNode
   value?: number
   detail?: string
   icon: typeof Activity
+  featured?: boolean
 }) {
   return (
-    <Card className="rounded-none border-0 bg-transparent px-5 py-6 md:px-7">
+    <Card className={`rounded-none border-0 px-5 py-6 md:px-7 ${featured ? "bg-primary text-white" : "bg-transparent"}`}>
       <CardHeader className="p-0 pb-3 md:px-0">
         <div className="flex items-center justify-between">
-          <CardDescription className="text-xs font-medium">{label}</CardDescription>
-          <Icon className="size-4 text-muted-foreground" />
+          <CardDescription className={`text-sm leading-5 ${featured ? "font-normal text-white" : "font-medium"}`}>{label}</CardDescription>
+          <Icon className={`size-4 shrink-0 ${featured ? "text-white/80" : "text-muted-foreground"}`} aria-hidden="true" />
         </div>
       </CardHeader>
       <CardContent className="p-0 md:px-0 md:pb-0">
         {value === undefined ? <Skeleton className="mb-2 h-9 w-20" /> : <p className="font-display text-5xl font-semibold tracking-[-0.05em] tabular-nums">{value.toLocaleString("pl-PL")}</p>}
-        {detail && <p className="mt-2 text-xs text-muted-foreground">{detail}</p>}
+        <p className={`mt-2 min-h-8 text-xs leading-4 ${featured ? "text-white/90" : "text-muted-foreground"}`}>{detail}</p>
       </CardContent>
     </Card>
   )
@@ -429,7 +431,7 @@ function App() {
       <main className="mx-auto max-w-[1280px] px-5 py-9 md:px-8 md:py-12">
         <section id="overview" className="mb-9 flex flex-wrap items-end justify-between gap-5">
           <div className="max-w-2xl">
-            <h2 className="font-display text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.045em] md:text-5xl xl:text-[3.5rem]">
+            <h2 className="font-display text-3xl font-semibold leading-[1.2] tracking-[-0.035em] md:text-4xl">
               Ile razy padło nazwisko <span className="text-primary">Tusk</span> na kanale Republiki?
             </h2>
             <a
@@ -453,16 +455,9 @@ function App() {
           </p>
         )}
         <section className={`stat-grid grid overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 sm:grid-cols-2 ${showWeeklySummary ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
-          <div className="bg-primary px-5 py-6 text-white md:px-7" aria-label="Tusków na godzinę">
-            <p className="font-display text-xl font-bold leading-tight tracking-tight">Tusków na godzinę</p>
-            <div className="my-2 flex items-baseline gap-2">
-              <span className="font-display text-6xl font-semibold tracking-[-0.05em] tabular-nums">
-                {liveStats?.summary.lastHour?.toLocaleString("pl-PL") ?? "—"}
-              </span>
-              <span className="text-sm text-white/85">/ godz.</span>
-            </div>
-            <p className="text-xs text-white/90">{hourlyFrequencyLabel(liveStats?.summary.lastHour)}</p>
-          </div>
+          <StatCard label={<><strong className="font-bold">Tusk</strong>ów na godzinę</>}
+            value={liveStats?.summary.lastHour} detail={hourlyFrequencyLabel(liveStats?.summary.lastHour)}
+            icon={Radio} featured />
           <StatCard label="Dzisiaj" value={liveStats?.summary.today}
             detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "względem wczoraj o tej porze")}
             icon={Clock3} />
@@ -470,7 +465,7 @@ function App() {
             detail={comparisonCaption(liveStats?.summary.last24Hours, liveStats?.summary.previous24Hours, "względem poprzednich 24 godz.")}
             icon={Activity} />
           {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`}
-            value={liveStats?.summary.last7Days} detail={dailyAverageCaption(liveStats?.summary.dailyAverage)} icon={BarChart3} />}
+            value={liveStats?.summary.last7Days} detail={dailyAverageCaption(liveStats?.summary.dailyAverage) ?? (liveStats ? "Niepełne dane do średniej" : undefined)} icon={BarChart3} />}
 
         </section>
 
