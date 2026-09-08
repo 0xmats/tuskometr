@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis, usePlotArea } from "recharts"
 
-import { ShareResult } from "@/components/share-result"
 import { comparisonCaption, dailyAverageCaption, peakHourCaption } from "@/lib/stat-captions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -443,13 +442,12 @@ function App() {
               href={`https://www.youtube.com/watch?v=${SOURCE_VIDEO_ID}`}
               target="_blank"
               rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+              className="ml-[3px] mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
             >
               Zobacz monitorowaną transmisję
               <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
             </a>
           </div>
-          <ShareResult dashboard={dashboard} />
         </section>
 
         {dataIsStale && (
