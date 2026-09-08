@@ -6,6 +6,8 @@ import {
   BarChart3,
   Clock3,
   ExternalLink,
+  ChartNoAxesCombined,
+  Mountain,
   Radio,
   RefreshCw,
   SearchX,
@@ -150,11 +152,13 @@ function StatCard({
   value,
   detail,
   icon: Icon,
+  detailIcon: DetailIcon,
 }: {
   label: string
   value?: number
   detail?: string
   icon: typeof Activity
+  detailIcon?: typeof Activity
 }) {
   return (
     <Card className="rounded-none border-0 bg-transparent px-5 py-6 md:px-7">
@@ -166,7 +170,10 @@ function StatCard({
       </CardHeader>
       <CardContent className="p-0 md:px-0 md:pb-0">
         {value === undefined ? <Skeleton className="mb-2 h-9 w-20" /> : <p className="font-display text-5xl font-semibold tracking-[-0.05em] tabular-nums">{value.toLocaleString("pl-PL")}</p>}
-        {detail && <p className="mt-2 text-xs leading-4 text-muted-foreground">{detail}</p>}
+        {detail && <p className="mt-2 flex items-start gap-1 text-xs leading-4 text-muted-foreground">
+          {DetailIcon && <DetailIcon className="mt-0.5 size-3 shrink-0" aria-hidden="true" />}
+          <span>{detail}</span>
+        </p>}
       </CardContent>
     </Card>
   )
@@ -468,9 +475,10 @@ function App() {
             icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours}
             detail={peakHourCaption(liveStats?.summary.peakHour)}
-            icon={Activity} />
+            icon={Activity} detailIcon={Mountain} />
           {showWeeklySummary && <StatCard label={`Ostatnie ${rangeLabel(7, dashboard?.stats, dashboard?.generatedAt)}`}
-            value={liveStats?.summary.last7Days} detail={dailyAverageCaption(liveStats?.summary.dailyAverage) ?? (liveStats ? "Niepełne dane do średniej" : undefined)} icon={BarChart3} />}
+            value={liveStats?.summary.last7Days} detail={dailyAverageCaption(liveStats?.summary.dailyAverage) ?? (liveStats ? "Niepełne dane do średniej" : undefined)}
+            icon={BarChart3} detailIcon={liveStats?.summary.dailyAverage != null ? ChartNoAxesCombined : undefined} />}
 
         </section>
 
