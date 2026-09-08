@@ -96,16 +96,27 @@ def test_missing_yesterday_clock_time_hides_comparison():
     assert summary(now=now).yesterday_so_far is None
 
 
-def test_peak_uses_complete_clock_hours_and_earliest_tie():
-    now = NOW + timedelta(minutes=30)
-    times = [NOW - timedelta(hours=2, minutes=15)] * 3
-    times += [NOW - timedelta(hours=1, minutes=15)] * 3
-    times += [now] * 20  # The current partial hour must not win.
-    times += [now - timedelta(hours=24)] * 30  # Partial oldest hour, too.
-    peak = summary(times, now=now).peak_hour
-    assert peak.count == 3
-    assert peak.start == NOW - timedelta(hours=3)
-    assert peak.end == NOW - timedelta(hours=2)
+def test_peak_uses_rolling_hour_and_earliest_tie():
+    end = NOW - timedelta(minutes=49)
+    times = [end - timedelta(hours=1), end, end + timedelta(hours=3)]
+    peak = summary(times).peak_hour
+    assert peak.count == 2
+    assert peak.start == end - timedelta(hours=1)
+    assert peak.end == end
+
+
+def test_peak_window_stays_inside_last_day():
+    lower = NOW - timedelta(days=1)
+    peak = summary([lower - timedelta(seconds=1)] * 20 + [lower, lower + timedelta(minutes=5)]).peak_hour
+    assert peak.count == 2
+    assert peak.start == lower
+    assert peak.end == lower + timedelta(hours=1)
+
+
+def test_peak_includes_recent_mentions():
+    peak = summary([NOW - timedelta(minutes=3), NOW]).peak_hour
+    assert peak.count == 2
+    assert peak.end == NOW
 
 
 def test_peak_hidden_without_coverage_or_mentions():

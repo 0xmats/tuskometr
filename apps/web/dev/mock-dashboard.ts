@@ -35,14 +35,15 @@ export function buildMockDashboard(fixture: Fixture, now = Date.now()) {
     last7Days: within(7 * day).length,
     dailyAverage: fixture.historyDays >= 1 ? within(7 * day).length / Math.min(7, fixture.historyDays) : null,
   }
-  const hourCounts = new Map<number, number>()
-  for (const item of within(day)) {
-    const start = Math.floor(Date.parse(item.occurredAt) / 3_600_000) * 3_600_000
-    if (start >= now - day && start + 3_600_000 <= now) hourCounts.set(start, (hourCounts.get(start) ?? 0) + 1)
+  const recent = within(day).map(item => Date.parse(item.occurredAt)).filter(t => t <= now).sort((a, b) => a - b)
+  let peakHour: { count: number; start: string; end: string } | null = null
+  if (fixture.historyDays >= 1) {
+    for (const end of [...new Set(recent.map(t => Math.max(t, now - day + 3_600_000)))]) {
+      const start = end - 3_600_000
+      const count = recent.filter(t => start <= t && t <= end).length
+      if (!peakHour || count > peakHour.count) peakHour = { count, start: iso(start), end: iso(end) }
+    }
   }
-  const peak = [...hourCounts].sort(([a, x], [b, y]) => y - x || a - b)[0]
-  const peakHour = fixture.historyDays >= 1 && peak
-    ? { count: peak[1], start: iso(peak[0]), end: iso(peak[0] + 3_600_000) } : null
   const ascending = [...all].reverse().filter(item => Date.parse(item.occurredAt) <= now)
   let hourlyRecord: { count: number; start: string; end: string } | null = null
   let left = 0

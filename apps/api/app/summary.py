@@ -1,5 +1,5 @@
 """Comparable source-time windows for dashboard captions."""
-from collections import Counter
+from bisect import bisect_left, bisect_right
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -38,11 +38,14 @@ def build_summary(
 
     peak_hour = None
     if complete(now - day):
-        hours = Counter(t.astimezone(zone).replace(minute=0, second=0, microsecond=0).astimezone(UTC)
-                        for t in timestamps if now - day <= t <= now)
-        for start, total in sorted(hours.items()):
-            end = start + timedelta(hours=1)
-            if start >= now - day and end <= now and (peak_hour is None or total > peak_hour.count):
+        lower = now - day
+        hour = timedelta(hours=1)
+        recent = sorted(t for t in timestamps if lower <= t <= now)
+        # Complete rolling windows, including one anchored at the oldest boundary.
+        for end in sorted({max(t, lower + hour) for t in recent}):
+            start = end - hour
+            total = bisect_right(recent, end) - bisect_left(recent, start)
+            if peak_hour is None or total > peak_hour.count:
                 peak_hour = PeakHour(count=total, start=start, end=end)
 
     last_week = count(now - 7 * day)

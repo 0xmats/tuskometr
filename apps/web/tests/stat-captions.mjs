@@ -26,7 +26,9 @@ assert.equal(dailyAverageCaption(undefined), undefined)
 console.log('Stat captions: comparisons, zero baseline, missing data and daily average passed')
 const { peakHourCaption } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
 const peak = { count: 82, start: '2026-09-08T17:00:00Z', end: '2026-09-08T18:00:00Z' }
-assert.equal(peakHourCaption(peak), 'Szczyt: 82 wzmianki (19–20)')
-assert.equal(peakHourCaption({ ...peak, count: 1 }), 'Szczyt: 1 wzmianka (19–20)')
-assert.equal(peakHourCaption({ ...peak, count: 12 }), 'Szczyt: 12 wzmianek (19–20)')
+assert.equal(peakHourCaption(peak), 'Maksimum: 82 wzmianki (19:00–20:00)')
+assert.equal(peakHourCaption({ ...peak, count: 1 }), 'Maksimum: 1 wzmianka (19:00–20:00)')
+assert.equal(peakHourCaption({ ...peak, count: 12 }), 'Maksimum: 12 wzmianek (19:00–20:00)')
 assert.equal(peakHourCaption(null), undefined)
+
+assert.equal(peakHourCaption({ count: 10, start: '2026-09-08T20:11:00Z', end: '2026-09-08T21:11:00Z' }), 'Maksimum: 10 wzmianek (22:11–23:11)')
