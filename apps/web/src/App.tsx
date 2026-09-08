@@ -436,7 +436,7 @@ function App() {
       <main className="mx-auto max-w-[1280px] px-5 py-9 md:px-8 md:py-12">
         <section id="overview" className="mb-9 flex flex-wrap items-end justify-between gap-5">
           <div className="max-w-2xl">
-            <h2 className="font-display text-[2rem] font-semibold leading-[1.2] tracking-[-0.035em] md:text-[2.5rem]">
+            <h2 className="font-display text-[2.125rem] font-semibold leading-[1.2] tracking-[-0.035em] md:text-[2.75rem]">
               Ile razy padło nazwisko <span className="text-primary">Tusk</span> na kanale Republiki?
             </h2>
             <a
