@@ -19,8 +19,8 @@ any consecutive 60 minutes across all stored mentions, including history older
 than 30 days. Windows include both endpoints, matching the live counter; they end
 at a mention timestamp, and the earliest ending window wins ties. A window can
 begin before the first collected sample; missing coverage is not inferred. The
-page shows the earliest available data timestamp and explains that collection
-gaps can affect the observed record. All displayed dates use Europe/Warsaw.
+footer shows the earliest available data timestamp. All displayed dates use
+Europe/Warsaw.
 
 Clicking the record opens its mentions newest first, ten at a time, with a return
 to live action. Publishers create separate record pages shared by all chart ranges;

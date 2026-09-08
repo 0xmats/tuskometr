@@ -315,9 +315,6 @@ function App() {
   const dashboard = pages[0]
   const liveStats = dashboard?.stats
   const hourlyRecord = liveStats?.hourlyRecord
-  const recordPercentage = hourlyRecord && hourlyRecord.count > 0 && liveStats?.summary.lastHour !== undefined
-    ? (100 * liveStats.summary.lastHour / hourlyRecord.count).toLocaleString("pl-PL", { maximumFractionDigits: 1 })
-    : null
   const statsQuery = {
     ...occurrencesQuery, data: selectedBucket?.dashboard.stats ?? dashboard?.stats,
     isLoading: !dashboard && (manifestQuery.isPending || occurrencesQuery.isPending),
@@ -478,17 +475,8 @@ function App() {
               <span className="block text-sm font-semibold">Rekord: {hourlyRecord.count.toLocaleString("pl-PL")} Tusków / godz.</span>
               <span className="mt-1 block text-xs text-muted-foreground">{formatInterval(hourlyRecord.start, hourlyRecord.end)}</span>
             </span>
-            <span className="text-xs text-muted-foreground">
-              {recordPercentage !== null && <span className="mb-1 block">Obecne tempo: <strong className="font-semibold text-foreground">{recordPercentage}% rekordu</strong></span>}
-              <span className="inline-flex items-center gap-1 font-medium text-primary">Zobacz fragmenty <ArrowUpRight className="size-4" aria-hidden="true" /></span>
-            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">Zobacz fragmenty <ArrowUpRight className="size-4" aria-hidden="true" /></span>
           </button>
-        )}
-        {liveStats?.historyStartedAt && (
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            Zbieramy dane od {formatDate(liveStats.historyStartedAt)}, {formatTime(liveStats.historyStartedAt)} (czas polski).
-            {" "}Rekord dotyczy dowolnych kolejnych 60 minut w zebranych danych. Przerwy w zbieraniu mogą wpływać na wynik.
-          </p>
         )}
 
         <section id="analysis" className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.65fr)]">
@@ -651,6 +639,9 @@ function App() {
               z Telewizją Republika ani YouTube.
             </p>
             <p>Źródło: publiczna transmisja Telewizji Republika w YouTube.</p>
+            {liveStats?.historyStartedAt && (
+              <p>Zbieramy dane od {formatDate(liveStats.historyStartedAt)}, {formatTime(liveStats.historyStartedAt)} (czas polski).</p>
+            )}
           </section>
         </footer>
       </main>
