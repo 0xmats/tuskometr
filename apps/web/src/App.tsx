@@ -445,7 +445,7 @@ function App() {
         )}
         <section className={`stat-grid grid overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 sm:grid-cols-2 ${showWeeklySummary ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
           <div className="bg-primary px-5 py-6 text-white md:px-7" aria-label="Tusków na godzinę">
-            <p className="text-base leading-5"><strong className="font-bold">Tusk</strong>ów na godzinę</p>
+            <p className="text-base leading-5"><strong className="font-bold">Tusków</strong> na godzinę</p>
             <div className="my-2 flex items-baseline gap-2">
               <span className="font-display text-6xl font-semibold tracking-[-0.05em] tabular-nums">
                 {liveStats?.summary.lastHour?.toLocaleString("pl-PL") ?? "—"}
