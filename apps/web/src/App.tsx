@@ -432,8 +432,19 @@ function App() {
             <h2 className="font-display text-[2rem] font-semibold leading-[1.2] tracking-[-0.035em] md:text-[2.5rem]">
               Ile razy padło nazwisko <span className="text-primary">Tusk</span> na kanale Republiki?
             </h2>
+            <a
+              href={`https://www.youtube.com/watch?v=${SOURCE_VIDEO_ID}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+            >
+              Zobacz monitorowaną transmisję
+              <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
+            </a>
           </div>
-          <ShareResult dashboard={dashboard} />
+          <div className="flex w-full justify-end">
+            <ShareResult dashboard={dashboard} />
+          </div>
         </section>
 
         {dataIsStale && (
@@ -455,7 +466,7 @@ function App() {
             <p className="text-xs leading-4 text-white/90">{hourlyFrequencyLabel(liveStats?.summary.lastHour)}</p>
           </div>
           <StatCard label="Dzisiaj" value={liveStats?.summary.today}
-            detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "w porównaniu z wczorajszym wynikiem do tej samej godziny")}
+            detail={comparisonCaption(liveStats?.summary.today, liveStats?.summary.yesterdaySoFar, "Względem dnia wczorajszego")}
             icon={Clock3} />
           <StatCard label="Ostatnie 24 godziny" value={liveStats?.summary.last24Hours}
             detail={comparisonCaption(liveStats?.summary.last24Hours, liveStats?.summary.previous24Hours, "względem poprzednich 24 godz.")}
