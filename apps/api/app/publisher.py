@@ -35,6 +35,7 @@ def publication_signature(snapshot: Snapshot) -> bytes:
             item.model_dump(mode="json", by_alias=True)
             for item in snapshot.occurrences[longest_range]
         ],
+        "youtubeTimeline": snapshot.youtube_timeline,
         "historyStartedAt": json.loads(snapshot.stats[longest_range])["historyStartedAt"],
         "hourlyRecord": json.loads(snapshot.stats[longest_range]).get("hourlyRecord"),
         "recordItems": [item.model_dump(mode="json", by_alias=True)
@@ -106,6 +107,7 @@ def publish(snapshot: Snapshot, root: Path, stale_seconds: float = 120) -> dict:
         "generatedAt": snapshot.generated_at.isoformat(),
         "staleAfterSeconds": stale_seconds,
         "dashboards": {},
+        "youtubeTimeline": snapshot.youtube_timeline,
     }
     try:
         record_pages = []

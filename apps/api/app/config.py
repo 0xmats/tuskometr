@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     youtube_dvr_hours: float = Field(default=12, ge=0.1, le=12)
     youtube_dvr_catchup_chunk_seconds: int = Field(default=300, ge=5, le=300)
     youtube_history_enabled: bool = True
+    youtube_timeline_file: Path = Path("/timeline/youtube.json")
+    youtube_timeline_interval_seconds: float = Field(default=60, ge=30, le=120)
+    youtube_timeline_max_age_seconds: float = Field(default=180, ge=150, le=300)
+    youtube_player_origin: str = "https://tuskometr.pages.dev"
 
     healthchecks_collecting_url: SecretStr = SecretStr("")
     healthchecks_publishing_url: SecretStr = SecretStr("")
@@ -60,6 +64,17 @@ class Settings(BaseSettings):
     dashboard_output_dir: Path = Path("/snapshots")
     dashboard_retention_seconds: float = Field(default=900, ge=600, le=86400)
     dashboard_max_stale_seconds: float = Field(default=120, ge=30, le=900)
+
+    @field_validator("youtube_player_origin")
+    @classmethod
+    def validate_player_origin(cls, value: str) -> str:
+        from urllib.parse import urlsplit
+
+        url = urlsplit(value)
+        if (url.scheme != "https" or not url.hostname or url.username or url.password
+                or url.path not in ("", "/") or url.query or url.fragment):
+            raise ValueError("YOUTUBE_PLAYER_ORIGIN must be an HTTPS origin")
+        return value.rstrip("/")
 
     @field_validator("dashboard_max_stale_seconds")
     @classmethod

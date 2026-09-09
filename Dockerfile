@@ -15,7 +15,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HF_HOME=/models/huggingface \
     DENO_DIR=/tmp/deno \
-    DENO_NO_UPDATE_CHECK=1
+    DENO_NO_UPDATE_CHECK=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ffmpeg curl tini \
@@ -27,12 +28,14 @@ COPY --from=deno /deno /usr/local/bin/deno
 WORKDIR /app/apps/api
 COPY apps/api/pyproject.toml ./
 COPY apps/api/app ./app
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+    && python -m playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY apps/api/alembic.ini ./
 COPY apps/api/alembic ./alembic
 
-RUN mkdir -p /data /models /backups /snapshots && chown -R 10001:10001 /app /data /models /backups /snapshots
+RUN mkdir -p /data /models /backups /snapshots /timeline && chown -R 10001:10001 /app /data /models /backups /snapshots /timeline
 USER 10001:10001
 
 ENTRYPOINT ["/usr/bin/tini", "--"]

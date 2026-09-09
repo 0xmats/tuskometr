@@ -222,3 +222,6 @@ npm run build
 The restic integration test requires the `restic` executable.
 Use a source you are authorized to process; public YouTube availability alone
 is not permission for automated extraction.
+
+Server-side fragment-link calibration, fallback and release checks are described
+in [deploy/youtube-timeline.md](deploy/youtube-timeline.md).

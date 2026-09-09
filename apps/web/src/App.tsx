@@ -293,7 +293,7 @@ function App() {
     refetchOnWindowFocus: true,
   })
   const manifest = manifestQuery.data
-  const timeline = useYouTubeTimelineOrigin(SOURCE_VIDEO_ID)
+  const timeline = useYouTubeTimelineOrigin(SOURCE_VIDEO_ID, manifest, manifestQuery.isPending, now)
   const occurrencesQuery = useInfiniteQuery({
     queryKey: ["dashboard", days, manifest?.version],
     queryFn: ({ pageParam }) => fetchDashboard(pageParam),

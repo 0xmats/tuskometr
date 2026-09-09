@@ -107,6 +107,7 @@ class R2Publisher:
             "generatedAt": snapshot.generated_at.isoformat(),
             "staleAfterSeconds": self.settings.dashboard_max_stale_seconds,
             "dashboards": dashboards,
+            "youtubeTimeline": snapshot.youtube_timeline,
         }
         self.put("dashboard/manifest.json", encode(manifest), "public, max-age=5, must-revalidate")
         with self.db:

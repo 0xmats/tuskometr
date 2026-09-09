@@ -15,7 +15,7 @@
     "dev:stop": "bash scripts/frontend-control.sh stop",
     "dev:status": "bash scripts/frontend-control.sh status",
     "dev:web": "npm run dev --workspace @tuskometr/web --",
-    "dev:api": "docker compose up --build web publisher worker backup",
+    "dev:api": "docker compose up --build web publisher worker backup youtube-timeline",
     "build": "npm run build:api && npm run build:web",
     "build:api": "docker build --target runtime -t tuskometr:dev .",
     "build:web": "npm run build --workspace @tuskometr/web",

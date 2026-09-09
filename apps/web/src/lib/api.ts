@@ -71,7 +71,15 @@ export type Dashboard = {
   occurrences: OccurrencePage
 }
 
+export type YouTubeCalibration = {
+  videoId: string
+  origin: number
+  checkedAt: number
+  expiresAt: number
+}
+
 export type Manifest = {
+  youtubeTimeline?: YouTubeCalibration | null
   version: string
   generatedAt: string
   staleAfterSeconds: number

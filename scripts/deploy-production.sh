@@ -33,7 +33,12 @@ fi
 # Resolve a fresh URL and decode actual audio before interrupting ingestion.
 # This also catches an unreachable home proxy before changing running services.
 "${compose[@]}" run --rm --no-deps worker python -m app.youtube_check
-"${compose[@]}" stop worker publisher backup
+# Verify actual player calibration through the configured YouTube proxy before
+# replacing the running services. A preflight must not race the periodic writer.
+# Use a separate temporary output file, leaving the live cached offset untouched.
+"${compose[@]}" run --rm --no-deps -e YOUTUBE_TIMELINE_FILE=/tmp/preflight-youtube.json \
+  youtube-timeline python -m app.youtube_timeline --once
+"${compose[@]}" stop worker publisher backup youtube-timeline
 # Back up an existing database before running migrations. Fresh volumes have no DB.
 "${compose[@]}" run --rm --no-deps backup python -c '
 from pathlib import Path
@@ -45,7 +50,7 @@ if p.exists():
 # Keep the canonical migration service on the release image. A one-off `run`
 # leaves an old migrate container behind, which later `compose start` can reuse.
 "${compose[@]}" up --no-build --no-deps --force-recreate --exit-code-from migrate migrate
-"${compose[@]}" up -d --no-build --no-deps worker publisher backup
+"${compose[@]}" up -d --no-build --no-deps worker publisher backup youtube-timeline
 # Verify a new R2 manifest from this publisher, without relying on CDN caches.
 "${compose[@]}" exec -T publisher python - <<'PY'
 import json
@@ -65,16 +70,18 @@ for attempt in range(24):
         response = client.get_object(Bucket=s.r2_bucket, Key='dashboard/manifest.json')
         manifest = json.loads(response['Body'].read())
         generated = datetime.fromisoformat(manifest['generatedAt']).astimezone(timezone.utc).timestamp()
-        if generated >= started:
-            print('New R2 publication verified')
+        timeline = manifest.get('youtubeTimeline') or {}
+        if (generated >= started and timeline.get('checkedAt', 0) >= started
+                and timeline.get('expiresAt', 0) > time.time()):
+            print('New R2 publication and server-side YouTube calibration verified')
             break
     except Exception:
         pass
     time.sleep(5)
 else:
-    raise SystemExit('Publisher did not produce a fresh manifest; inspect VPS logs')
+    raise SystemExit('Fresh manifest with YouTube calibration unavailable; inspect VPS logs')
 PY
-for service in worker publisher backup; do
+for service in worker publisher backup youtube-timeline; do
   test -n "$("${compose[@]}" ps --status running -q "$service")"
 done
 printf 'TUSKOMETR_IMAGE=%s\n' "$image" > .release.env

@@ -27,6 +27,7 @@ from .schemas import (
     StatsResponse,
     StatusResponse,
 )
+from .youtube_timeline import read_calibration
 
 RANGES = (0, 1, 7, 30)  # 0 denotes the last hour, with minute buckets.
 PAGE_SIZE = 30
@@ -84,6 +85,7 @@ class Snapshot:
     occurrences: Mapping[int, tuple[OccurrenceDto, ...]]
     positions: Mapping[int, Mapping[int, int]]
     record_items: tuple[OccurrenceDto, ...] = ()
+    youtube_timeline: dict | None = None
 
     def page(self, days: int, cursor: int | None = None) -> OccurrencePage:
         rows = self.occurrences[days]
@@ -185,6 +187,7 @@ def build_snapshot(
             }
         ),
         record_items=record_items,
+        youtube_timeline=read_calibration(settings, now.timestamp()),
     )
     for days, selected in occurrences.items():
         # UTC keys distinguish repeated hours at the autumn DST transition.

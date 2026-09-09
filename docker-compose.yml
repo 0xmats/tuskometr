@@ -55,6 +55,8 @@ services:
     environment:
       DASHBOARD_STORAGE: local
       DATABASE_URL: sqlite:////data/tuskometr.db
+      SOURCE_URL: ${SOURCE_URL:-https://www.youtube.com/watch?v=dzntyCTgJMQ}
+      SOURCE_MODE: ${SOURCE_MODE:-youtube}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Warsaw}
       HEALTHCHECKS_PUBLISHING_URL: ${HEALTHCHECKS_PUBLISHING_URL:-}
       DASHBOARD_REFRESH_SECONDS: ${DASHBOARD_REFRESH_SECONDS:-5}
@@ -65,6 +67,31 @@ services:
       - ./apps/api/app:/app/apps/api/app:ro
       - app-data:/data
       - dashboard-data:/snapshots
+      - timeline-data:/timeline:ro
+
+  youtube-timeline:
+    image: tuskometr:dev
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    command: ["python", "-m", "app.youtube_timeline"]
+    shm_size: 256mb
+    mem_limit: 768m
+    cpus: 1.0
+    environment:
+      SOURCE_URL: ${SOURCE_URL:-https://www.youtube.com/watch?v=dzntyCTgJMQ}
+      YOUTUBE_PROXY_URL: ${YOUTUBE_PROXY_URL:-}
+      YOUTUBE_PLAYER_ORIGIN: ${YOUTUBE_PLAYER_ORIGIN:-https://tuskometr.pages.dev}
+    volumes:
+      - timeline-data:/timeline
+      - ./apps/api/app:/app/apps/api/app:ro
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.youtube_timeline", "--check"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
 
   worker:
     image: tuskometr:dev
@@ -149,3 +176,4 @@ volumes:
   model-cache:
   backup-data:
   dashboard-data:
+  timeline-data:
