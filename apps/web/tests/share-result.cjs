@@ -93,18 +93,20 @@ async function main() {
           const share = dialog.getByRole('button', { name: 'Udostępnij', exact: true })
           if (mode === 'native') {
             await dialog.getByRole('button', { name: 'Kopiuj obrazek', exact: true }).click()
-            await dialog.getByText('Obrazek skopiowany. Wklej go do wiadomości lub posta.').waitFor()
+            await dialog.getByRole('status').filter({ hasText: 'Obrazek skopiowany' }).waitFor()
             assert.equal(await page.evaluate(() => window.shared.length), 0, 'direct copy bypasses OS sharing')
             assert.equal(await page.evaluate(() => window.copiedImages.length), 1)
           }
-          await share.click()
+          await share.evaluate(button => { button.click(); button.click() })
           if (mode === 'native') {
             await page.waitForFunction(() => typeof window.finishShare === 'function')
             assert.equal(await share.isDisabled(), true)
+            assert.equal(await page.evaluate(() => window.shared.length), 1, 'rapid clicks share only once')
             const data = await page.evaluate(() => window.shared[0])
             assert.equal(data.files.length, 1)
             assert.equal(data.files[0].type, 'image/png')
             assert.ok(data.files[0].size > 1000)
+            assert.equal(data.title, undefined)
             assert.equal(data.text, undefined)
             assert.equal(data.url, undefined)
             await page.evaluate(() => window.finishShare())
@@ -112,7 +114,7 @@ async function main() {
             await dialog.getByRole('alert').waitFor()
           } else {
             await page.waitForFunction(() => window.shared.length === 1 &&
-              !Array.from(document.querySelectorAll('dialog button')).find(b => b.textContent === 'Udostępnij').disabled)
+              !Array.from(document.querySelectorAll('dialog button')).find(b => b.getAttribute('aria-label') === 'Udostępnij').disabled)
             assert.equal(await dialog.getByRole('alert').count(), 0)
           }
           assert.equal(await page.evaluate(() => window.copiedImages.length), mode === 'native' ? 1 : 0)
@@ -120,25 +122,26 @@ async function main() {
           await dialog.getByRole('button', { name: 'Kopiuj obrazek', exact: true }).click()
           if (mode === 'denied') await dialog.getByRole('alert').waitFor()
           else {
-            await dialog.getByText('Obrazek skopiowany. Wklej go do wiadomości lub posta.').waitFor()
+            await dialog.getByRole('status').filter({ hasText: 'Obrazek skopiowany' }).waitFor()
             assert.equal(await page.evaluate(() => window.copiedImages.length), 1)
             const bytes = Buffer.from(await page.evaluate(() => window.copiedImages[0]))
             assert.equal(bytes.readUInt32BE(16), 1920)
             assert.equal(bytes.readUInt32BE(20), 720)
           }
-          const download = page.waitForEvent('download')
-          await dialog.getByRole('link', { name: 'Pobierz', exact: true }).click()
-          const bytes = await fs.readFile(await (await download).path())
-          assert.equal(bytes.readUInt32BE(16), 1920)
-          assert.equal(bytes.readUInt32BE(20), 720)
+          assert.equal(await dialog.getByRole('link', { name: 'Pobierz' }).count(), 0)
           await dialog.getByRole('button', { name: 'Kopiuj link', exact: true }).click()
           if (mode === 'denied') {
             const input = dialog.getByRole('textbox', { name: 'Skopiuj link:' })
             await input.waitFor()
             assert.equal(await input.inputValue(), `${new URL(site).origin}/`)
           } else {
-            await dialog.getByText('Link skopiowany.').waitFor()
+            await dialog.getByRole('status').filter({ hasText: 'Link skopiowany' }).waitFor()
             assert.deepEqual(await page.evaluate(() => window.copiedLinks), [`${new URL(site).origin}/`])
+            const linkButton = dialog.getByRole('button', { name: 'Kopiuj link', exact: true })
+            const confirmation = linkButton.locator('span.absolute')
+            assert.ok((await confirmation.getAttribute('class')).includes('opacity-100'))
+            await page.waitForTimeout(2000)
+            assert.ok((await confirmation.getAttribute('class')).includes('opacity-0'))
           }
         }
         if (mode === 'native') {
@@ -160,7 +163,7 @@ async function main() {
       assert.deepEqual(errors, [])
       await page.close()
     }
-    console.log('PASS: on-demand PNG preview, native image sharing, cancellation, image clipboard, download fallback, link copy, mobile and no writes')
+    console.log('PASS: on-demand PNG preview, native image sharing, cancellation, image clipboard, button feedback, link copy, mobile and no writes')
   } finally { await browser.close() }
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

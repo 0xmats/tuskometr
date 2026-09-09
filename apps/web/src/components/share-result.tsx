@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react"
-import { Check, Copy, Download, Loader2, Share2, X } from "lucide-react"
+import { Check, Copy, Loader2, Share2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Dashboard } from "@/lib/api"
 import { renderShareCard, shareUrl, snapshotAlt, snapshotFromDashboard, type ShareSnapshot } from "@/lib/share"
@@ -10,8 +10,16 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
   const titleId = useId()
   const [snapshot, setSnapshot] = useState<ShareSnapshot | null>(null)
   const [image, setImage] = useState<{ file: File; url: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState("")
+  type Action = "image" | "share" | "link"
+  const pending = useRef(false)
+  const [busy, setBusy] = useState<Action | null>(null)
+  const [completed, setCompleted] = useState<Action | null>(null)
+
+  useEffect(() => {
+    if (!completed) return
+    const timer = window.setTimeout(() => setCompleted(null), 1800)
+    return () => window.clearTimeout(timer)
+  }, [completed])
   const [error, setError] = useState("")
   const [manualLink, setManualLink] = useState(false)
 
@@ -22,8 +30,9 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
     const modal = dialog.current
     modal?.showModal()
     setImage(null)
-    setBusy(false)
-    setNotice("")
+    pending.current = false
+    setBusy(null)
+    setCompleted(null)
     setError("")
     setManualLink(false)
     void renderShareCard(snapshot).then(blob => {
@@ -42,50 +51,61 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
   }, [snapshot])
 
   const shareData = image && snapshot ? {
-    files: [image.file], title: "Tuskometr",
+    files: [image.file],
   } : null
   let nativeShare = false
   try {
     nativeShare = !!shareData && typeof navigator.share === "function" &&
       typeof navigator.canShare === "function" && navigator.canShare(shareData)
-  } catch { /* Use clipboard and download when file sharing is unavailable. */ }
+  } catch { /* Use the clipboard when file sharing is unavailable. */ }
 
   const canCopyImage = typeof navigator.clipboard?.write === "function" && typeof ClipboardItem !== "undefined"
 
-  async function shareImage(useNative = false) {
-    if (!image || !shareData || busy) return
+  async function runAction(action: Action) {
+    if (pending.current || completed === action) return
+    if (action !== "link" && (!image || !shareData)) return
     const current = operation.current
-    setBusy(true)
-    setNotice("")
+    pending.current = true
+    setBusy(action)
+    setCompleted(null)
     setError("")
+    setManualLink(false)
     try {
-      if (useNative) {
-        await navigator.share(shareData)
+      if (action === "share") {
+        // Pass only the file, with no additional share items or metadata.
+        await navigator.share(shareData!)
+      } else if (action === "image") {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": image!.file })])
       } else {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": image.file })])
-        if (operation.current === current) setNotice("Obrazek skopiowany. Wklej go do wiadomości lub posta.")
+        await navigator.clipboard.writeText(shareUrl())
       }
+      if (operation.current === current) setCompleted(action)
     } catch (error) {
       if (operation.current === current && !(error instanceof Error && error.name === "AbortError")) {
-        setError("Nie udało się przekazać obrazka. Pobierz go i dołącz do wiadomości.")
+        if (action === "link") setManualLink(true)
+        else setError("Nie udało się przekazać obrazka. Spróbuj ponownie lub skopiuj link.")
       }
     } finally {
-      if (operation.current === current) setBusy(false)
+      if (operation.current === current) {
+        pending.current = false
+        setBusy(null)
+      }
     }
   }
 
-  async function copyLink() {
-    const current = operation.current
-    try {
-      await navigator.clipboard.writeText(shareUrl())
-      if (operation.current === current) {
-        setManualLink(false)
-        setNotice("Link skopiowany.")
-      }
-    } catch {
-      if (operation.current === current) setManualLink(true)
-    }
+  function actionContent(action: Action, label: string, icon: React.ReactNode) {
+    const done = completed === action
+    return <>
+      <span className={`flex items-center gap-2 transition-all duration-200 motion-reduce:transition-none ${done ? "scale-95 opacity-0" : "scale-100 opacity-100"}`}>
+        {busy === action ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : icon}{label}
+      </span>
+      <span aria-hidden="true" className={`absolute inset-0 flex items-center justify-center gap-2 transition-all duration-200 motion-reduce:transition-none ${done ? "scale-100 opacity-100" : "scale-75 opacity-0"}`}>
+        <Check className="size-5" strokeWidth={3} />OK
+      </span>
+    </>
   }
+  const primaryAction = !canCopyImage && nativeShare ? "share" : "image"
+  const primaryLabel = primaryAction === "share" ? "Udostępnij obrazek" : "Kopiuj obrazek"
 
   return <>
     <Button variant="outline" disabled={!dashboard || dashboard.stats.summary.lastHour == null}
@@ -114,24 +134,17 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
       </div>
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <Button disabled={!image || busy} onClick={() => void shareImage(!canCopyImage && nativeShare)} className="w-full sm:w-auto">
-            {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              : !canCopyImage && nativeShare ? <Share2 className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
-            {!canCopyImage && nativeShare ? "Udostępnij obrazek" : "Kopiuj obrazek"}
+          <Button aria-label={primaryLabel} disabled={!image || busy !== null} onClick={() => void runAction(primaryAction)} className="relative w-full sm:w-auto">
+            {actionContent(primaryAction, primaryLabel, primaryAction === "share" ? <Share2 className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />)}
           </Button>
-          {canCopyImage && nativeShare && <Button variant="ghost" disabled={!image || busy} onClick={() => void shareImage(true)}>
-            <Share2 className="size-4" aria-hidden="true" />Udostępnij
+          {canCopyImage && nativeShare && <Button aria-label="Udostępnij" variant="ghost" className="relative" disabled={!image || busy !== null} onClick={() => void runAction("share")}>
+            {actionContent("share", "Udostępnij", <Share2 className="size-4" aria-hidden="true" />)}
           </Button>}
-          {image && <Button asChild variant="ghost"><a href={image.url} download={image.file.name}>
-            <Download className="size-4" aria-hidden="true" />Pobierz
-          </a></Button>}
-          <Button variant="ghost" onClick={copyLink} disabled={busy}>
-            <Copy className="size-4" aria-hidden="true" />Kopiuj link
+          <Button aria-label="Kopiuj link" variant="ghost" className="relative" onClick={() => void runAction("link")} disabled={busy !== null}>
+            {actionContent("link", "Kopiuj link", <Copy className="size-4" aria-hidden="true" />)}
           </Button>
         </div>
-        <p aria-live="polite" className={notice ? "mt-3 flex items-start gap-2 text-sm text-muted-foreground" : "sr-only"}>
-          {notice && <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />}{notice}
-        </p>
+        <span role="status" className="sr-only">{completed === "image" ? "Obrazek skopiowany" : completed === "link" ? "Link skopiowany" : completed === "share" ? "Przekazano do udostępniania" : ""}</span>
         {error && <p role="alert" className="mt-3 text-sm text-primary">{error}</p>}
         {manualLink && <label className="mt-3 block text-sm">Skopiuj link:
           <input autoFocus readOnly value={shareUrl()} onFocus={event => event.target.select()}

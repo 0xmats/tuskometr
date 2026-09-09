@@ -60,8 +60,9 @@ using the displayed last-hour and today counts and publication time captured at
 click time. The image matches the dashboard’s red and light statistic tiles, with the logo,
 Republika channel label, two results, a short timestamp and the site address. The primary action copies the image directly when the clipboard API is available.
 Supported browsers also offer native sharing of a single PNG, without a link preview.
-Download and link copying are also available. Canceling native sharing does not
-copy anything; clipboard or sharing failures leave the download available.
+Link copying is also available. Success briefly displays a checkmark on the action button.
+Native sharing passes only one PNG with no title, text or URL. Canceling does not copy anything;
+failures allow retrying or copying the link.
 The button is disabled until the last-hour result is available; zero is valid.
 Demo images and messages are explicitly labeled.
 
