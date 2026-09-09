@@ -206,7 +206,7 @@ function TimelineItem({ item, timeline }: { item: Occurrence; timeline: ReturnTy
         </div>
         <HighlightedQuote text={item.quote} />
       </div>
-      <div className="flex w-fit shrink-0 items-start gap-1">
+      <div className="flex w-fit shrink-0 items-center gap-1">
         {momentUrl ? (
           <Button asChild size="sm">
             <a href={momentUrl} target="_blank" rel="noreferrer">
@@ -214,6 +214,13 @@ function TimelineItem({ item, timeline }: { item: Occurrence; timeline: ReturnTy
               Zobacz fragment
             </a>
           </Button>
+        ) : import.meta.env.DEV && import.meta.env.VITE_MOCK_DATA === "true" ? (
+          <span title="Dane demonstracyjne — brak powiązanego nagrania.">
+            <Button disabled size="sm" className="disabled:opacity-100">
+              <ExternalLink className="size-4" aria-hidden="true" />
+              Zobacz fragment
+            </Button>
+          </span>
         ) : withinDvr && (timeline.status === "loading" || timeline.status === "retrying") ? (
           <Button disabled variant="outline" size="sm">
             <RefreshCw className="size-4 motion-safe:animate-spin" />
