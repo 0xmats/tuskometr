@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ShareResult } from "@/components/share-result"
 import { useYouTubeTimelineOrigin } from "@/hooks/use-youtube-timeline"
 import {
   fetchDashboard,
@@ -59,7 +60,7 @@ const normalizedForms = new Set(["tusk", "tuska", "tuskowi", "tuskiem", "tusku",
 const SOURCE_VIDEO_ID = "dzntyCTgJMQ"
 const YOUTUBE_DVR_SECONDS = 12 * 60 * 60
 // Empirical correction for early playback in YouTube links.
-const LINK_OFFSET_SECONDS = 4
+const LINK_OFFSET_SECONDS = 6
 const LINK_PREROLL_SECONDS = 3
 
 
@@ -448,6 +449,7 @@ function App() {
               <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
             </a>
           </div>
+          <ShareResult dashboard={dashboard} />
         </section>
 
         {dataIsStale && (

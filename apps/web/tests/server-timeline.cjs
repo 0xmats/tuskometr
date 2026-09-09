@@ -48,13 +48,13 @@ async function main() {
     releaseManifest()
     const link = page.getByRole('link', { name: 'Zobacz fragment', exact: true })
     await link.waitFor()
-    assert.equal(new URL(await link.getAttribute('href')).searchParams.get('t'), '99941s')
+    assert.equal(new URL(await link.getAttribute('href')).searchParams.get('t'), '99943s')
     assert.equal(youtubeRequests.length, 0, 'fresh calibration needs no player requests')
     assert.equal(await page.locator('iframe').count(), 0)
     // Refresh the calibration while keeping the immutable dashboard version unchanged.
     sample = { ...sample, origin: origin + 2 }
     await page.clock.runFor(6000)
-    await page.waitForFunction(() => document.querySelector('a[href*="t=99939s"]'))
+    await page.waitForFunction(() => document.querySelector('a[href*="t=99941s"]'))
     assert.equal(youtubeRequests.length, 0)
     // An expired sample must stop generating links and start the legacy fallback.
     serverNow += 181000

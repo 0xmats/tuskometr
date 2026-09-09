@@ -1,76 +1,158 @@
-// Against the offline Vite fixture; override PLAYWRIGHT_MODULE_PATH and TEST_URL as needed.
+// Built-site integration: run against Vite preview with PLAYWRIGHT_MODULE_PATH set.
 const assert = require('node:assert/strict')
 const fs = require('node:fs/promises')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
+const site = process.env.TEST_URL || 'http://127.0.0.1:4175'
 
 async function main() {
-  const browser = await chromium.launch({ args: ['--no-sandbox'] })
+  const browser = await chromium.launch({ headless: true })
   try {
-    const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] })
-    const page = await context.newPage()
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
-    await page.addInitScript(() => {
-      window.renders = 0
-      window.originalToBlob = HTMLCanvasElement.prototype.toBlob
-      HTMLCanvasElement.prototype.toBlob = function (...args) {
-        window.renders++
-        return window.originalToBlob.apply(this, args)
+    for (const mode of ['native', 'cancel', 'native-error', 'clipboard', 'denied', 'render-error', 'missing']) {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+      const errors = []
+      const writes = []
+      page.on('pageerror', error => errors.push(error.message))
+      page.on('request', request => {
+        if (request.method() !== 'GET') writes.push(request.url())
+      })
+      await page.addInitScript(mode => {
+        window.shared = []
+        window.copiedImages = []
+        window.copiedLinks = []
+        window.drawnImages = 0
+        const toBlob = HTMLCanvasElement.prototype.toBlob
+        HTMLCanvasElement.prototype.toBlob = function (...args) {
+          window.drawnImages++
+          if (mode === 'render-error') return args[0](null)
+          return toBlob.apply(this, args)
+        }
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+          write: async items => {
+            if (mode === 'denied') throw new DOMException('Denied', 'NotAllowedError')
+            const blob = await items[0].getType('image/png')
+            window.copiedImages.push([...new Uint8Array(await blob.arrayBuffer())])
+          },
+          writeText: async text => {
+            if (mode === 'denied') throw new DOMException('Denied', 'NotAllowedError')
+            window.copiedLinks.push(text)
+          },
+        } })
+        Object.defineProperty(navigator, 'canShare', { configurable: true,
+          value: data => ['native', 'cancel', 'native-error'].includes(mode) && data.files?.[0]?.type === 'image/png' })
+        Object.defineProperty(navigator, 'share', { configurable: true, value: async data => {
+          window.shared.push({ title: data.title, text: data.text, url: data.url,
+            files: data.files.map(file => ({ name: file.name, type: file.type, size: file.size })) })
+          if (mode === 'cancel') throw new DOMException('Canceled', 'AbortError')
+          if (mode === 'native-error') throw new DOMException('Denied', 'NotAllowedError')
+          await new Promise(resolve => { window.finishShare = resolve })
+        } })
+      }, mode)
+      const now = Date.now()
+      const generatedAt = new Date(now).toISOString()
+      await page.route('**/dashboard/manifest.json', route => route.fulfill({
+        headers: { Date: new Date(now).toUTCString() }, json: {
+          version: 'share-test', generatedAt, staleAfterSeconds: 120,
+          youtubeTimeline: { videoId: 'dzntyCTgJMQ', origin: now / 1000 - 100000,
+            checkedAt: now / 1000, expiresAt: now / 1000 + 180 },
+          dashboards: { '1': '/dashboard/share-test.json' },
+        },
+      }))
+      await page.route('**/dashboard/share-test.json', route => route.fulfill({ json: {
+        generatedAt,
+        stats: { summary: { lastHour: mode === 'missing' ? null : mode === 'clipboard' ? 0 : 42,
+          today: 150, last24Hours: 321, last7Days: 500 },
+          range: { from: new Date(now - 86400000).toISOString(), to: generatedAt, total: 321 },
+          buckets: [], forms: [] },
+        status: { state: 'live', updatedAt: generatedAt, lagSeconds: 0 },
+        occurrences: { items: [], nextPage: null },
+      } }))
+      await page.goto(`${site}/?tracking=test#overview`)
+      await page.getByText('150', { exact: true }).waitFor()
+      const button = page.getByRole('button', { name: 'Udostępnij wynik', exact: true })
+      assert.equal(await page.evaluate(() => window.drawnImages), 0, 'no image before clicking')
+      if (mode === 'missing') {
+        assert.equal(await button.isDisabled(), true)
+        await page.close()
+        continue
       }
-    })
-    await page.goto(process.env.TEST_URL || 'http://127.0.0.1:3017')
-    await page.locator('article').first().waitFor()
-    const trigger = page.getByRole('button', { name: 'Udostępnij', exact: true })
-    const panel = page.getByRole('region', { name: 'Udostępnianie' })
-    await trigger.click()
-    await panel.getByText('Link skopiowany', { exact: true }).waitFor()
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), new URL(page.url()).origin + '/')
-    assert.equal(await page.evaluate(() => window.renders), 0, 'opening only copies the link')
-    assert.equal(await panel.locator('input, img').count(), 0, 'no visible URL or preview')
-    assert.equal(await panel.getByRole('button', { name: 'Pobierz PNG' }).count(), 0)
-    await panel.getByRole('button', { name: 'Kopiuj obrazek' }).click()
-    await panel.getByText('Obrazek skopiowany', { exact: true }).waitFor()
-    const bytes = Buffer.from(await page.evaluate(async () => {
-      const items = await navigator.clipboard.read()
-      const blob = await items[0].getType('image/png')
-      return [...new Uint8Array(await blob.arrayBuffer())]
-    }))
-    assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
-    assert.equal(bytes.readUInt32BE(16), 1200)
-    assert.equal(bytes.readUInt32BE(20), 630)
-    assert.equal(await page.evaluate(() => window.renders), 1)
-    await page.keyboard.press('Escape')
-    await panel.waitFor({ state: 'detached' })
-    assert.equal(await trigger.evaluate(element => element === document.activeElement), true)
-    for (const width of [320, 375, 640, 1280]) {
-      await page.setViewportSize({ width, height: 812 })
-      await trigger.click()
-      await panel.waitFor()
-      const box = await panel.boundingBox()
-      assert.ok(box.x >= 0 && box.x + box.width <= width, `panel fits ${width}px screen`)
-      if (width === 375) await page.screenshot({ path: '/tmp/tuskometr-share-compact.png' })
-      await page.locator('h1').click()
-      await panel.waitFor({ state: 'detached' })
+      await button.click()
+      const dialog = page.getByRole('dialog', { name: 'Udostępnij wynik' })
+      await dialog.waitFor()
+      if (mode === 'render-error') {
+        await dialog.getByRole('alert').waitFor()
+        assert.equal(await dialog.getByRole('button', { name: 'Kopiuj obrazek' }).isDisabled(), true)
+        assert.equal(await dialog.getByRole('link', { name: 'Pobierz' }).count(), 0)
+      } else {
+        const preview = dialog.getByRole('img')
+        await preview.waitFor()
+        assert.equal(await preview.evaluate(img => img.naturalWidth), 640)
+        assert.equal(await preview.evaluate(img => img.naturalHeight), 240)
+        assert.equal(await page.evaluate(() => window.drawnImages), 1)
+        if (['native', 'cancel', 'native-error'].includes(mode)) {
+          const share = dialog.getByRole('button', { name: 'Udostępnij obrazek', exact: true })
+          await share.click()
+          if (mode === 'native') {
+            await page.waitForFunction(() => typeof window.finishShare === 'function')
+            assert.equal(await share.isDisabled(), true)
+            const data = await page.evaluate(() => window.shared[0])
+            assert.equal(data.files.length, 1)
+            assert.equal(data.files[0].type, 'image/png')
+            assert.ok(data.files[0].size > 1000)
+            assert.match(data.text, /^42 wzmianki o Tusku/)
+            assert.equal(data.url, `${new URL(site).origin}/`)
+            await page.evaluate(() => window.finishShare())
+          } else if (mode === 'native-error') {
+            await dialog.getByRole('alert').waitFor()
+          } else {
+            await page.waitForFunction(() => window.shared.length === 1 &&
+              !Array.from(document.querySelectorAll('dialog button')).find(b => b.textContent === 'Udostępnij obrazek').disabled)
+            assert.equal(await dialog.getByRole('alert').count(), 0)
+          }
+          assert.equal(await page.evaluate(() => window.copiedImages.length), 0)
+        } else {
+          await dialog.getByRole('button', { name: 'Kopiuj obrazek', exact: true }).click()
+          if (mode === 'denied') await dialog.getByRole('alert').waitFor()
+          else {
+            await dialog.getByText('Obrazek skopiowany. Wklej go do wiadomości lub posta.').waitFor()
+            const bytes = Buffer.from(await page.evaluate(() => window.copiedImages[0]))
+            assert.equal(bytes.readUInt32BE(16), 640)
+            assert.equal(bytes.readUInt32BE(20), 240)
+          }
+          const download = page.waitForEvent('download')
+          await dialog.getByRole('link', { name: 'Pobierz', exact: true }).click()
+          const bytes = await fs.readFile(await (await download).path())
+          assert.equal(bytes.readUInt32BE(16), 640)
+          assert.equal(bytes.readUInt32BE(20), 240)
+          await dialog.getByRole('button', { name: 'Kopiuj link', exact: true }).click()
+          if (mode === 'denied') {
+            const input = dialog.getByRole('textbox', { name: 'Skopiuj link:' })
+            await input.waitFor()
+            assert.equal(await input.inputValue(), `${new URL(site).origin}/`)
+          } else {
+            await dialog.getByText('Link skopiowany.').waitFor()
+            assert.deepEqual(await page.evaluate(() => window.copiedLinks), [`${new URL(site).origin}/`])
+          }
+        }
+        if (mode === 'native') {
+          const imageBytes = await preview.evaluate(async img => [...new Uint8Array(await (await fetch(img.src)).arrayBuffer())])
+          await fs.writeFile('/tmp/tuskometr-share-card.png', Buffer.from(imageBytes))
+          for (const width of [320, 375, 640, 1280]) {
+            await page.setViewportSize({ width, height: 900 })
+            const box = await dialog.boundingBox()
+            assert.ok(box.x >= 0 && box.x + box.width <= width, `dialog fits ${width}px viewport`)
+            assert.equal(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), true)
+            if (width === 375) await page.screenshot({ path: '/tmp/tuskometr-share-mobile.png' })
+          }
+        }
+      }
+      await page.keyboard.press('Escape')
+      assert.equal(await dialog.isVisible(), false)
+      assert.equal(await button.evaluate(el => document.activeElement === el), true)
+      assert.deepEqual(writes, [])
+      assert.deepEqual(errors, [])
+      await page.close()
     }
-    await page.evaluate(() => {
-      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied') } } })
-    })
-    await trigger.click()
-    await panel.getByLabel('Link do strony').waitFor()
-    assert.equal(await panel.getByLabel('Link do strony').inputValue(), new URL(page.url()).origin + '/')
-    await page.evaluate(() => { HTMLCanvasElement.prototype.toBlob = callback => callback(null) })
-    await panel.getByRole('button', { name: 'Kopiuj obrazek' }).click()
-    await panel.getByRole('alert').waitFor()
-    await page.evaluate(() => { HTMLCanvasElement.prototype.toBlob = window.originalToBlob })
-    await panel.getByRole('button', { name: 'Kopiuj obrazek' }).click()
-    await panel.getByText('Nie można skopiować obrazka. Możesz go pobrać.').waitFor()
-    const retried = page.waitForEvent('download')
-    await panel.getByRole('button', { name: 'Pobierz PNG' }).click()
-    const fallbackBytes = await fs.readFile(await (await retried).path())
-    assert.equal(fallbackBytes.readUInt32BE(16), 1200)
-    assert.equal(await panel.getByRole('alert').count(), 0)
-    assert.deepEqual(errors, [])
-    console.log('Compact share: immediate copy, image clipboard, on-demand PNG fallback, keyboard/outside dismissal, mobile, clipboard fallback and retry passed')
+    console.log('PASS: on-demand PNG preview, native image sharing, cancellation, image clipboard, download fallback, link copy, mobile and no writes')
   } finally { await browser.close() }
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

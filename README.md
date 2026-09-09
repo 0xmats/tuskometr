@@ -55,19 +55,23 @@ through **Build, Test and Deploy** from `main` for both improvements.
 
 ## Sharing results
 
-“Udostępnij” immediately copies the live-site link and shows a compact confirmation
-with an optional “Kopiuj obrazek” action. Only that action draws a 1200 × 630 PNG in
-the browser and copies it to the clipboard, using the displayed numbers and
-publication timestamp at click time. Download is offered only if image clipboard
-access is unavailable or denied.
-If clipboard access is denied, the panel offers the link for manual copying.
-No share images, pages or records are written to R2 or the backend.
+“Udostępnij wynik” opens a preview of a compact 640 × 240 PNG generated in the browser,
+using the displayed last-hour and today counts and publication time captured at
+click time. The image matches the dashboard’s red and light statistic tiles, with the logo,
+Republika channel label, two results, a short timestamp and the site address. Supported browsers offer native image sharing
+with a short message and link; otherwise the primary action copies the image.
+Download and link copying are also available. Canceling native sharing does not
+copy anything; clipboard or sharing failures leave the download available.
+The button is disabled until the last-hour result is available; zero is valid.
+Demo images and messages are explicitly labeled.
 
 The shared link always points to the live site's root, without query parameters,
 fragments or embedded statistics. Opening it loads the normal live dashboard.
-Only the PNG preserves the captured numbers and timestamp. Attach it to show those
-numbers in a social post. This feature adds no R2 storage, writes or share-related
-reads; visits to the live site use its existing data publication and caching policy.
+The image and message preserve the captured numbers and timestamp. Link previews
+keep the static Tuskometr logo. Images are generated only after clicking, with no
+server-side records or image storage. This feature adds no R2 storage, writes or
+share-related reads; visits to the live site use its existing data publication
+and caching policy.
 No backend dependencies, deployment configuration or storage migrations are needed.
 
 ## Recovery after interruptions
