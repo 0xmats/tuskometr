@@ -55,11 +55,11 @@ through **Build, Test and Deploy** from `main` for both improvements.
 
 ## Sharing results
 
-“Udostępnij wynik” opens a preview of a compact 640 × 240 PNG generated in the browser,
+“Udostępnij wynik” opens a preview of a compact 640 × 240 preview of a 1920 × 720 PNG generated in the browser,
 using the displayed last-hour and today counts and publication time captured at
 click time. The image matches the dashboard’s red and light statistic tiles, with the logo,
-Republika channel label, two results, a short timestamp and the site address. Supported browsers offer native image sharing
-with a short message and link; otherwise the primary action copies the image.
+Republika channel label, two results, a short timestamp and the site address. The primary action copies the image directly when the clipboard API is available.
+Supported browsers also offer native sharing of a single PNG, without a link preview.
 Download and link copying are also available. Canceling native sharing does not
 copy anything; clipboard or sharing failures leave the download available.
 The button is disabled until the last-hour result is available; zero is valid.

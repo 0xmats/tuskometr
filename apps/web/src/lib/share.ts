@@ -46,10 +46,13 @@ export function snapshotAlt(snapshot: ShareSnapshot): string {
 export async function renderShareCard(snapshot: ShareSnapshot): Promise<Blob> {
   await document.fonts.ready
   const canvas = document.createElement("canvas")
-  canvas.width = 640
-  canvas.height = 240
+  // Draw at export resolution so text stays crisp on high-density screens.
+  const scale = 3
+  canvas.width = 640 * scale
+  canvas.height = 240 * scale
   const ctx = canvas.getContext("2d")
   if (!ctx) throw new Error("Nie można utworzyć obrazka")
+  ctx.scale(scale, scale)
   ctx.fillStyle = "#ffffff"
   ctx.fillRect(0, 0, 640, 240)
   ctx.textBaseline = "top"

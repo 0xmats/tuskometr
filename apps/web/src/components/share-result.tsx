@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react"
 import { Check, Copy, Download, Loader2, Share2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Dashboard } from "@/lib/api"
-import { renderShareCard, shareText, shareUrl, snapshotAlt, snapshotFromDashboard, type ShareSnapshot } from "@/lib/share"
+import { renderShareCard, shareUrl, snapshotAlt, snapshotFromDashboard, type ShareSnapshot } from "@/lib/share"
 
 export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
   const dialog = useRef<HTMLDialogElement>(null)
@@ -42,7 +42,7 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
   }, [snapshot])
 
   const shareData = image && snapshot ? {
-    files: [image.file], title: "Tuskometr", text: shareText(snapshot), url: shareUrl(),
+    files: [image.file], title: "Tuskometr",
   } : null
   let nativeShare = false
   try {
@@ -50,14 +50,16 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
       typeof navigator.canShare === "function" && navigator.canShare(shareData)
   } catch { /* Use clipboard and download when file sharing is unavailable. */ }
 
-  async function shareImage() {
+  const canCopyImage = typeof navigator.clipboard?.write === "function" && typeof ClipboardItem !== "undefined"
+
+  async function shareImage(useNative = false) {
     if (!image || !shareData || busy) return
     const current = operation.current
     setBusy(true)
     setNotice("")
     setError("")
     try {
-      if (nativeShare) {
+      if (useNative) {
         await navigator.share(shareData)
       } else {
         await navigator.clipboard.write([new ClipboardItem({ "image/png": image.file })])
@@ -112,11 +114,14 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
       </div>
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <Button disabled={!image || busy} onClick={shareImage} className="w-full sm:w-auto">
+          <Button disabled={!image || busy} onClick={() => void shareImage(!canCopyImage && nativeShare)} className="w-full sm:w-auto">
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              : nativeShare ? <Share2 className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
-            {nativeShare ? "Udostępnij obrazek" : "Kopiuj obrazek"}
+              : !canCopyImage && nativeShare ? <Share2 className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
+            {!canCopyImage && nativeShare ? "Udostępnij obrazek" : "Kopiuj obrazek"}
           </Button>
+          {canCopyImage && nativeShare && <Button variant="ghost" disabled={!image || busy} onClick={() => void shareImage(true)}>
+            <Share2 className="size-4" aria-hidden="true" />Udostępnij
+          </Button>}
           {image && <Button asChild variant="ghost"><a href={image.url} download={image.file.name}>
             <Download className="size-4" aria-hidden="true" />Pobierz
           </a></Button>}

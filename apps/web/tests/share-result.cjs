@@ -29,6 +29,7 @@ async function main() {
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
           write: async items => {
             if (mode === 'denied') throw new DOMException('Denied', 'NotAllowedError')
+            if (items.length !== 1) throw new Error('Expected exactly one clipboard item')
             const blob = await items[0].getType('image/png')
             window.copiedImages.push([...new Uint8Array(await blob.arrayBuffer())])
           },
@@ -85,11 +86,17 @@ async function main() {
       } else {
         const preview = dialog.getByRole('img')
         await preview.waitFor()
-        assert.equal(await preview.evaluate(img => img.naturalWidth), 640)
-        assert.equal(await preview.evaluate(img => img.naturalHeight), 240)
+        assert.equal(await preview.evaluate(img => img.naturalWidth), 1920)
+        assert.equal(await preview.evaluate(img => img.naturalHeight), 720)
         assert.equal(await page.evaluate(() => window.drawnImages), 1)
         if (['native', 'cancel', 'native-error'].includes(mode)) {
-          const share = dialog.getByRole('button', { name: 'Udostępnij obrazek', exact: true })
+          const share = dialog.getByRole('button', { name: 'Udostępnij', exact: true })
+          if (mode === 'native') {
+            await dialog.getByRole('button', { name: 'Kopiuj obrazek', exact: true }).click()
+            await dialog.getByText('Obrazek skopiowany. Wklej go do wiadomości lub posta.').waitFor()
+            assert.equal(await page.evaluate(() => window.shared.length), 0, 'direct copy bypasses OS sharing')
+            assert.equal(await page.evaluate(() => window.copiedImages.length), 1)
+          }
           await share.click()
           if (mode === 'native') {
             await page.waitForFunction(() => typeof window.finishShare === 'function')
@@ -98,31 +105,32 @@ async function main() {
             assert.equal(data.files.length, 1)
             assert.equal(data.files[0].type, 'image/png')
             assert.ok(data.files[0].size > 1000)
-            assert.match(data.text, /^42 wzmianki o Tusku/)
-            assert.equal(data.url, `${new URL(site).origin}/`)
+            assert.equal(data.text, undefined)
+            assert.equal(data.url, undefined)
             await page.evaluate(() => window.finishShare())
           } else if (mode === 'native-error') {
             await dialog.getByRole('alert').waitFor()
           } else {
             await page.waitForFunction(() => window.shared.length === 1 &&
-              !Array.from(document.querySelectorAll('dialog button')).find(b => b.textContent === 'Udostępnij obrazek').disabled)
+              !Array.from(document.querySelectorAll('dialog button')).find(b => b.textContent === 'Udostępnij').disabled)
             assert.equal(await dialog.getByRole('alert').count(), 0)
           }
-          assert.equal(await page.evaluate(() => window.copiedImages.length), 0)
+          assert.equal(await page.evaluate(() => window.copiedImages.length), mode === 'native' ? 1 : 0)
         } else {
           await dialog.getByRole('button', { name: 'Kopiuj obrazek', exact: true }).click()
           if (mode === 'denied') await dialog.getByRole('alert').waitFor()
           else {
             await dialog.getByText('Obrazek skopiowany. Wklej go do wiadomości lub posta.').waitFor()
+            assert.equal(await page.evaluate(() => window.copiedImages.length), 1)
             const bytes = Buffer.from(await page.evaluate(() => window.copiedImages[0]))
-            assert.equal(bytes.readUInt32BE(16), 640)
-            assert.equal(bytes.readUInt32BE(20), 240)
+            assert.equal(bytes.readUInt32BE(16), 1920)
+            assert.equal(bytes.readUInt32BE(20), 720)
           }
           const download = page.waitForEvent('download')
           await dialog.getByRole('link', { name: 'Pobierz', exact: true }).click()
           const bytes = await fs.readFile(await (await download).path())
-          assert.equal(bytes.readUInt32BE(16), 640)
-          assert.equal(bytes.readUInt32BE(20), 240)
+          assert.equal(bytes.readUInt32BE(16), 1920)
+          assert.equal(bytes.readUInt32BE(20), 720)
           await dialog.getByRole('button', { name: 'Kopiuj link', exact: true }).click()
           if (mode === 'denied') {
             const input = dialog.getByRole('textbox', { name: 'Skopiuj link:' })
