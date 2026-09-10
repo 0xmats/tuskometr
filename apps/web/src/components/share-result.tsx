@@ -38,7 +38,7 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
     void renderShareCard(snapshot).then(blob => {
       if (operation.current !== current) return
       imageUrl = URL.createObjectURL(blob)
-      const filename = `tuskometr-${snapshot.generatedAt.replace(/[^0-9]/g, "").slice(0, 14)}.png`
+      const filename = "Tuskometr — wynik.png"
       setImage({ file: new File([blob], filename, { type: "image/png" }), url: imageUrl })
     }).catch(() => {
       if (operation.current === current) setError("Nie udało się przygotować obrazka. Zamknij okno i spróbuj ponownie.")
