@@ -133,14 +133,14 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
           </div>}
       </div>
       <div className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button aria-label={primaryLabel} disabled={!image || busy !== null} onClick={() => void runAction(primaryAction)} className="relative w-full sm:w-auto">
+        <div className={`grid gap-2 ${canCopyImage && nativeShare ? "grid-cols-2" : "grid-cols-1"}`}>
+          <Button aria-label={primaryLabel} disabled={!image || busy !== null} onClick={() => void runAction(primaryAction)} className="relative col-span-full w-full">
             {actionContent(primaryAction, primaryLabel, primaryAction === "share" ? <Share2 className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />)}
           </Button>
-          {canCopyImage && nativeShare && <Button aria-label="Udostępnij" variant="ghost" className="relative" disabled={!image || busy !== null} onClick={() => void runAction("share")}>
+          {canCopyImage && nativeShare && <Button aria-label="Udostępnij" variant="ghost" className="relative w-full" disabled={!image || busy !== null} onClick={() => void runAction("share")}>
             {actionContent("share", "Udostępnij", <Share2 className="size-4" aria-hidden="true" />)}
           </Button>}
-          <Button aria-label="Kopiuj link" variant="ghost" className="relative" onClick={() => void runAction("link")} disabled={busy !== null}>
+          <Button aria-label="Kopiuj link" variant="ghost" className="relative w-full" onClick={() => void runAction("link")} disabled={busy !== null}>
             {actionContent("link", "Kopiuj link", <Copy className="size-4" aria-hidden="true" />)}
           </Button>
         </div>
