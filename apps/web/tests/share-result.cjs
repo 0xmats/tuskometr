@@ -86,8 +86,8 @@ async function main() {
       } else {
         const preview = dialog.getByRole('img')
         await preview.waitFor()
-        assert.equal(await preview.evaluate(img => img.naturalWidth), 1920)
-        assert.equal(await preview.evaluate(img => img.naturalHeight), 720)
+        assert.equal(await preview.evaluate(img => img.naturalWidth), 1080)
+        assert.equal(await preview.evaluate(img => img.naturalHeight), 1440)
         assert.equal(await page.evaluate(() => window.drawnImages), 1)
         if (['native', 'cancel', 'native-error'].includes(mode)) {
           const share = dialog.getByRole('button', { name: 'Udostępnij', exact: true })
@@ -125,8 +125,8 @@ async function main() {
             await dialog.getByRole('status').filter({ hasText: 'Obrazek skopiowany' }).waitFor()
             assert.equal(await page.evaluate(() => window.copiedImages.length), 1)
             const bytes = Buffer.from(await page.evaluate(() => window.copiedImages[0]))
-            assert.equal(bytes.readUInt32BE(16), 1920)
-            assert.equal(bytes.readUInt32BE(20), 720)
+            assert.equal(bytes.readUInt32BE(16), 1080)
+            assert.equal(bytes.readUInt32BE(20), 1440)
           }
           assert.equal(await dialog.getByRole('link', { name: 'Pobierz' }).count(), 0)
           await dialog.getByRole('button', { name: 'Kopiuj link', exact: true }).click()

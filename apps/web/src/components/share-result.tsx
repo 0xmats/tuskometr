@@ -127,8 +127,8 @@ export function ShareResult({ dashboard }: { dashboard?: Dashboard }) {
         </Button>
       </div>
       <div className="border-y border-slate-200">
-        {image && snapshot ? <img src={image.url} alt={snapshotAlt(snapshot)} width={640} height={240} className="block h-auto w-full" />
-          : <div className="flex aspect-[8/3] items-center justify-center gap-2 text-sm text-muted-foreground">
+        {image && snapshot ? <img src={image.url} alt={snapshotAlt(snapshot)} width={360} height={480} className="mx-auto block h-auto max-h-[55dvh] w-auto max-w-full" />
+          : <div className="mx-auto flex aspect-[3/4] max-h-[55dvh] items-center justify-center gap-2 text-sm text-muted-foreground">
             {!error && <><Loader2 className="size-4 animate-spin" aria-hidden="true" />Przygotowywanie obrazka…</>}
           </div>}
       </div>
