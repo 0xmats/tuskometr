@@ -59,6 +59,7 @@ jobs:
       VPS_PORT: ${{ vars.VPS_PORT || '22' }}
       IMAGE: ${{ needs.build.outputs.image }}
       VITE_DATA_ORIGIN: ${{ vars.VITE_DATA_ORIGIN }}
+      TUSKOMETR_SITE_ORIGIN: ${{ vars.TUSKOMETR_SITE_ORIGIN || 'https://tuskometr.pages.dev' }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
     steps:

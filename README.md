@@ -208,6 +208,11 @@ Do not copy application sources or build images on the VPS.
 There are only two Compose files. Each is standalone; do not combine them.
 Local and production use separate project names, images and volumes.
 `npm run build:web` builds only the frontend; `npm run build:api` builds the Docker runtime.
+
+Link preview metadata defaults to `https://tuskometr.pages.dev`. When moving to
+the custom domain, set the GitHub Actions variable `TUSKOMETR_SITE_ORIGIN` to
+`https://tuskometr.com` and run **Build, Test and Deploy** from `main`.
+For local builds, set the same environment variable before `npm run build:web`.
 Production opens no incoming ports and includes remote backups.
 YouTube uses yt-dlp, Deno and FFmpeg with anonymous access. Production routes
 YouTube metadata and audio through a [home connection over Tailscale](deploy/youtube-egress.md),
